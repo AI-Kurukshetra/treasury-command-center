@@ -56,7 +56,7 @@ type LiquidityLoanRecord = {
   currency_code: string;
   principal_amount: number;
   outstanding_amount: number;
-  interest_rate_bps: number;
+  interest_rate: number;
   maturity_date: string;
   status: string;
 };
@@ -295,7 +295,7 @@ export default async function CashPage() {
                     <div>
                       <p className="font-medium">{formatCurrency(loan.principal_amount, loan.currency_code)}</p>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        Outstanding {formatCurrency(loan.outstanding_amount, loan.currency_code)} · {loan.interest_rate_bps} bps
+                        Outstanding {formatCurrency(loan.outstanding_amount, loan.currency_code)} · {Math.round(Number(loan.interest_rate ?? 0) * 10000)} bps
                       </p>
                     </div>
                     <Badge variant={loan.status === "active" ? "success" : "secondary"}>

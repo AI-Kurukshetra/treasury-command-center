@@ -1504,7 +1504,7 @@ export async function getLiquidityPayload() {
     selectMany(
       context.supabase,
       "intercompany_loans",
-      "id, lender_subsidiary_id, borrower_subsidiary_id, currency_code, principal_amount, outstanding_amount, interest_rate_bps, maturity_date, status, updated_at",
+      "id, lender_subsidiary_id, borrower_subsidiary_id, currency_code, principal_amount, outstanding_amount, interest_rate, maturity_date, status, updated_at",
       context.organizationId,
       { orderBy: "updated_at", ascending: false, limit: 20 }
     ),
@@ -1545,7 +1545,7 @@ export async function createLiquidityRecord(payload: unknown) {
     currency_code: parsed.currencyCode,
     principal_amount: parsed.principalAmount,
     outstanding_amount: parsed.principalAmount,
-    interest_rate_bps: parsed.interestRateBps,
+    interest_rate: parsed.interestRateBps / 10000,
     maturity_date: parsed.maturityDate ?? currentDateOffset(90),
     status: "active"
   });
