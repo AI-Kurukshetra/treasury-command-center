@@ -140,10 +140,10 @@ async function main() {
   await click(page.getByRole("button", { name: /create payment/i }), "Initiate a payment into the approval engine");
 
   await click(page.getByRole("link", { name: /^Risk/ }), "Open the risk and capital workspace");
-  await fill(page.getByLabel("Provider"), "Video Feed", "Enter a market-data provider");
-  await fill(page.getByLabel("Instrument type"), "fx_spot", "Enter the market-data instrument type");
-  await fill(page.getByLabel("Symbol"), "USD/INR", "Enter the market-data symbol");
-  await fill(page.getByLabel("Value"), "82.5", "Enter the market-data value");
+  await fill(page.getByPlaceholder("Reuters"), "Video Feed", "Enter a market-data provider");
+  await fill(page.getByPlaceholder("fx_spot"), "fx_spot", "Enter the market-data instrument type");
+  await fill(page.getByPlaceholder("USD/EUR"), "USD/INR", "Enter the market-data symbol");
+  await fill(page.getByPlaceholder("0.92"), "82.5", "Enter the market-data value");
   await click(page.getByRole("button", { name: /publish data point/i }), "Publish market data into treasury risk");
 
   await click(page.getByRole("link", { name: /^Reports/ }), "Open the treasury reporting center");
