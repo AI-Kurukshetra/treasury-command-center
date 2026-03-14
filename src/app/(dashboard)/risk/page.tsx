@@ -9,6 +9,7 @@ import {
   getInvestmentsPayload,
   getRiskPayload
 } from "@/lib/domain/treasury-api";
+import { getTreasuryInsights } from "@/lib/domain/treasury-insights";
 import { formatCurrency } from "@/lib/utils";
 
 type ExposureRecord = {
@@ -72,11 +73,12 @@ type CovenantTestRecord = {
 };
 
 export default async function RiskPage() {
-  const [snapshot, riskPayload, investmentsPayload, debtPayload] = await Promise.all([
+  const [snapshot, riskPayload, investmentsPayload, debtPayload, insightsPayload] = await Promise.all([
     getDashboardSnapshot(),
     getRiskPayload(),
     getInvestmentsPayload(),
-    getDebtPayload()
+    getDebtPayload(),
+    getTreasuryInsights()
   ]);
   const exposures = riskPayload.exposures as ExposureRecord[];
   const hedges = riskPayload.hedges as HedgeRecord[];
@@ -84,6 +86,9 @@ export default async function RiskPage() {
   const investments = investmentsPayload.investments as InvestmentRecord[];
   const facilities = debtPayload.facilities as DebtFacilityRecord[];
   const covenantTests = debtPayload.covenantTests as CovenantTestRecord[];
+  const riskInsights = insightsPayload.insights.filter((insight) =>
+    ["risk", "funding", "esg"].includes(insight.category)
+  );
 
   return (
     <>
@@ -366,6 +371,40 @@ export default async function RiskPage() {
                 </div>
               ))
             ) : null}
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="mt-6 grid gap-6">
+        <Card className="dark-panel border-slate-800 text-white">
+          <CardHeader>
+            <CardTitle className="text-white">Predictive recommendations</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {riskInsights.length ? (
+              riskInsights.map((insight) => (
+                <div key={insight.id} className="rounded-[1.35rem] border border-white/10 bg-white/8 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="font-medium text-white">{insight.title}</p>
+                      <p className="mt-1 text-sm text-white/70">{insight.detail}</p>
+                    </div>
+                    <Badge
+                      variant="outline"
+                      className="border-white/15 bg-white/10 text-white/80"
+                    >
+                      {insight.category}
+                    </Badge>
+                  </div>
+                  <p className="mt-3 text-xs uppercase tracking-[0.18em] text-white/60">{insight.action}</p>
+                </div>
+              ))
+            ) : (
+              <SectionEmpty
+                title="No recommendations"
+                description="Recommendations appear here when the current risk and funding dataset suggests action."
+              />
+            )}
           </CardContent>
         </Card>
       </section>

@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { SectionEmpty } from "@/components/ui/section-empty";
 import { getDashboardsPayload, getNotificationsPayload } from "@/lib/domain/treasury-api";
+import { getTreasuryInsights } from "@/lib/domain/treasury-insights";
 import { getDashboardSnapshot } from "@/lib/domain/treasury";
 import { formatCurrency } from "@/lib/utils";
 
@@ -65,16 +66,18 @@ type MobileDeviceRecord = {
 };
 
 export default async function DashboardPage() {
-  const [snapshot, dashboardWorkspace, notificationsWorkspace] = await Promise.all([
+  const [snapshot, dashboardWorkspace, notificationsWorkspace, insightsPayload] = await Promise.all([
     getDashboardSnapshot(),
     getDashboardsPayload(),
-    getNotificationsPayload()
+    getNotificationsPayload(),
+    getTreasuryInsights()
   ]);
   const dashboards = dashboardWorkspace.dashboards as DashboardRecord[];
   const widgets = dashboardWorkspace.widgets as WidgetRecord[];
   const queries = dashboardWorkspace.queries as QueryRecord[];
   const notifications = notificationsWorkspace.notifications as NotificationRecord[];
   const mobileDevices = notificationsWorkspace.mobileDevices as MobileDeviceRecord[];
+  const insights = insightsPayload.insights;
 
   return (
     <>
@@ -537,6 +540,46 @@ export default async function DashboardPage() {
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1fr_1fr]">
+        <Card>
+          <CardHeader>
+            <CardTitle>Treasury intelligence</CardTitle>
+            <CardDescription>
+              Derived recommendations from current liquidity, payments, funding, and investment posture.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {insights.map((insight) => (
+              <div
+                key={insight.id}
+                className="rounded-[1.35rem] border border-border/70 bg-white/68 p-4"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="font-medium">{insight.title}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">{insight.detail}</p>
+                  </div>
+                  <Badge
+                    variant={
+                      insight.tone === "critical"
+                        ? "destructive"
+                        : insight.tone === "warning"
+                          ? "warning"
+                          : insight.tone === "positive"
+                            ? "success"
+                            : "secondary"
+                    }
+                  >
+                    {insight.category}
+                  </Badge>
+                </div>
+                <p className="mt-3 text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                  {insight.action}
+                </p>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle>Alert command rail</CardTitle>
