@@ -16,7 +16,7 @@ import { ActionCard } from "@/components/operations/action-card";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { SectionEmpty } from "@/components/ui/section-empty";
-import { getDashboardsPayload } from "@/lib/domain/treasury-api";
+import { getDashboardsPayload, getNotificationsPayload } from "@/lib/domain/treasury-api";
 import { getDashboardSnapshot } from "@/lib/domain/treasury";
 import { formatCurrency } from "@/lib/utils";
 
@@ -46,14 +46,35 @@ type QueryRecord = {
   updated_at: string;
 };
 
+type NotificationRecord = {
+  id: string;
+  title: string;
+  body: string;
+  severity: string;
+  status: string;
+  created_at: string;
+};
+
+type MobileDeviceRecord = {
+  id: string;
+  device_label: string;
+  platform: string;
+  biometric_enabled: boolean;
+  last_seen_at: string | null;
+  status: string;
+};
+
 export default async function DashboardPage() {
-  const [snapshot, dashboardWorkspace] = await Promise.all([
+  const [snapshot, dashboardWorkspace, notificationsWorkspace] = await Promise.all([
     getDashboardSnapshot(),
-    getDashboardsPayload()
+    getDashboardsPayload(),
+    getNotificationsPayload()
   ]);
   const dashboards = dashboardWorkspace.dashboards as DashboardRecord[];
   const widgets = dashboardWorkspace.widgets as WidgetRecord[];
   const queries = dashboardWorkspace.queries as QueryRecord[];
+  const notifications = notificationsWorkspace.notifications as NotificationRecord[];
+  const mobileDevices = notificationsWorkspace.mobileDevices as MobileDeviceRecord[];
 
   return (
     <>
@@ -513,6 +534,135 @@ export default async function DashboardPage() {
             ))}
           </CardContent>
         </Card>
+      </section>
+
+      <section className="grid gap-6 xl:grid-cols-[1fr_1fr]">
+        <Card>
+          <CardHeader>
+            <CardTitle>Alert command rail</CardTitle>
+            <CardDescription>
+              Critical alerts and operator-generated notifications that shape day-to-day treasury action.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {notifications.length ? (
+              notifications.slice(0, 6).map((notification) => (
+                <div
+                  key={notification.id}
+                  className="rounded-[1.35rem] border border-border/70 bg-white/68 p-4"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="font-medium">{notification.title}</p>
+                      <p className="mt-1 text-sm text-muted-foreground">{notification.body}</p>
+                    </div>
+                    <Badge
+                      variant={
+                        notification.severity === "critical"
+                          ? "destructive"
+                          : notification.severity === "warning"
+                            ? "warning"
+                            : "secondary"
+                      }
+                    >
+                      {notification.severity}
+                    </Badge>
+                  </div>
+                  <p className="mt-3 text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                    {notification.status} · {notification.created_at.slice(0, 19)}
+                  </p>
+                </div>
+              ))
+            ) : (
+              <SectionEmpty
+                title="No notification trail yet"
+                description="Critical alerts and operator-published messages will accumulate here."
+              />
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="dark-panel border-slate-800 text-white">
+          <CardHeader>
+            <CardTitle className="text-white">Mobile and biometric posture</CardTitle>
+            <CardDescription className="text-white/70">
+              Device registration and biometric readiness for approvals on the move.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {mobileDevices.length ? (
+              mobileDevices.map((device) => (
+                <div key={device.id} className="rounded-[1.35rem] border border-white/10 bg-white/8 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="font-medium text-white">{device.device_label}</p>
+                      <p className="mt-1 text-sm text-white/70">
+                        {device.platform} · last seen {device.last_seen_at?.slice(0, 19) ?? "Never"}
+                      </p>
+                    </div>
+                    <Badge
+                      variant="outline"
+                      className="border-white/15 bg-white/10 text-white/80"
+                    >
+                      {device.biometric_enabled ? "biometric" : "password only"}
+                    </Badge>
+                  </div>
+                  <p className="mt-3 text-xs uppercase tracking-[0.18em] text-white/60">{device.status}</p>
+                </div>
+              ))
+            ) : (
+              <SectionEmpty
+                title="No devices registered"
+                description="Register a mobile device to demonstrate remote approvals with biometric posture."
+              />
+            )}
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="grid gap-6 xl:grid-cols-2">
+        <ActionCard
+          title="Publish manual alert"
+          description="Push a treasury alert into the command rail for critical operational follow-up."
+          endpoint="/api/notifications"
+          submitLabel="Create alert"
+          payloadDefaults={{ recordType: "notification" }}
+          fields={[
+            { name: "title", label: "Title", placeholder: "Funding cutoff approaching" },
+            { name: "body", label: "Body", type: "textarea", placeholder: "Review release queue before 15:00 UTC." },
+            {
+              name: "severity",
+              label: "Severity",
+              type: "select",
+              options: [
+                { label: "Info", value: "info" },
+                { label: "Warning", value: "warning" },
+                { label: "Critical", value: "critical" }
+              ]
+            }
+          ]}
+        />
+        <ActionCard
+          title="Register mobile device"
+          description="Track mobile approval posture and biometric readiness for the signed-in operator."
+          endpoint="/api/notifications"
+          submitLabel="Register device"
+          payloadDefaults={{ recordType: "mobile_device" }}
+          fields={[
+            { name: "deviceLabel", label: "Device label", placeholder: "Treasurer iPhone" },
+            { name: "platform", label: "Platform", placeholder: "iOS" },
+            {
+              name: "biometricEnabled",
+              label: "Biometric enabled",
+              type: "select",
+              options: [
+                { label: "True", value: "true" },
+                { label: "False", value: "false" }
+              ],
+              defaultValue: "true"
+            }
+          ]}
+        />
       </section>
     </>
   );

@@ -7,6 +7,7 @@ import { getDashboardSnapshot } from "@/lib/domain/treasury";
 import {
   getAccountsPayload,
   getCashPositionsPayload,
+  getLiquidityPayload,
   getTransactionsPayload
 } from "@/lib/domain/treasury-api";
 import { formatCurrency } from "@/lib/utils";
@@ -50,12 +51,31 @@ type SnapshotRecord = {
   freshness_status: string;
 };
 
+type LiquidityLoanRecord = {
+  id: string;
+  currency_code: string;
+  principal_amount: number;
+  outstanding_amount: number;
+  interest_rate_bps: number;
+  maturity_date: string;
+  status: string;
+};
+
+type TreasuryEventRecord = {
+  id: string;
+  event_type: string;
+  title: string;
+  due_date: string;
+  status: string;
+};
+
 export default async function CashPage() {
-  const [snapshot, accountsPayload, transactionsPayload, cashPositionsPayload] = await Promise.all([
+  const [snapshot, accountsPayload, transactionsPayload, cashPositionsPayload, liquidityPayload] = await Promise.all([
     getDashboardSnapshot(),
     getAccountsPayload(),
     getTransactionsPayload(),
-    getCashPositionsPayload()
+    getCashPositionsPayload(),
+    getLiquidityPayload()
   ]);
   const criticalEntities = snapshot.positions.filter((item) => item.status !== "healthy");
   const totalAvailable = snapshot.positions.reduce((sum, item) => sum + item.available, 0);
@@ -64,6 +84,8 @@ export default async function CashPage() {
   const statements = transactionsPayload.statements as StatementRecord[];
   const reconciliationRuns = transactionsPayload.reconciliationRuns as ReconciliationRecord[];
   const snapshots = cashPositionsPayload.snapshots as SnapshotRecord[];
+  const loans = liquidityPayload.loans as LiquidityLoanRecord[];
+  const treasuryEvents = liquidityPayload.events as TreasuryEventRecord[];
 
   return (
     <>
@@ -260,6 +282,77 @@ export default async function CashPage() {
       <section className="mt-6 grid gap-6 xl:grid-cols-[1fr_1fr]">
         <Card>
           <CardHeader>
+            <CardTitle>Intercompany liquidity</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {loans.length ? (
+              loans.map((loan) => (
+                <div
+                  key={loan.id}
+                  className="rounded-[1.35rem] border border-border/70 bg-white/68 p-4"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="font-medium">{formatCurrency(loan.principal_amount, loan.currency_code)}</p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Outstanding {formatCurrency(loan.outstanding_amount, loan.currency_code)} · {loan.interest_rate_bps} bps
+                      </p>
+                    </div>
+                    <Badge variant={loan.status === "active" ? "success" : "secondary"}>
+                      {loan.status}
+                    </Badge>
+                  </div>
+                  <p className="mt-3 text-sm text-muted-foreground">
+                    Maturity {loan.maturity_date}
+                  </p>
+                </div>
+              ))
+            ) : (
+              <SectionEmpty
+                title="No intercompany loans"
+                description="Create an intercompany funding record to start liquidity optimization across entities."
+              />
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Treasury calendar</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {treasuryEvents.length ? (
+              treasuryEvents.map((event) => (
+                <div
+                  key={event.id}
+                  className="rounded-[1.35rem] border border-border/70 bg-white/68 p-4"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="font-medium">{event.title}</p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {event.event_type} · due {event.due_date}
+                      </p>
+                    </div>
+                    <Badge variant={event.status === "scheduled" ? "warning" : "secondary"}>
+                      {event.status}
+                    </Badge>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <SectionEmpty
+                title="No calendar items"
+                description="Maturities, covenant tests, and payment due dates will surface here."
+              />
+            )}
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="mt-6 grid gap-6 xl:grid-cols-[1fr_1fr]">
+        <Card>
+          <CardHeader>
             <CardTitle>Cash snapshot history</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -361,6 +454,49 @@ export default async function CashPage() {
             submitLabel="Run reconciliation"
             payloadDefaults={{ recordType: "reconciliation" }}
             fields={[{ name: "runDate", label: "Run date", type: "date" }]}
+          />
+          <ActionCard
+            title="Create intercompany loan"
+            description="Record a funding movement between entities for liquidity optimization."
+            endpoint="/api/liquidity"
+            submitLabel="Create loan"
+            fields={[
+              {
+                name: "currencyCode",
+                label: "Currency",
+                type: "select",
+                options: [
+                  { label: "USD", value: "USD" },
+                  { label: "EUR", value: "EUR" },
+                  { label: "GBP", value: "GBP" }
+                ]
+              },
+              { name: "principalAmount", label: "Principal amount", type: "number", placeholder: "500000" },
+              { name: "interestRateBps", label: "Interest rate (bps)", type: "number", defaultValue: "250" },
+              { name: "maturityDate", label: "Maturity date", type: "date" }
+            ]}
+          />
+          <ActionCard
+            title="Create treasury event"
+            description="Add a maturity, covenant test, or payment due date into the treasury calendar."
+            endpoint="/api/debt"
+            submitLabel="Create event"
+            payloadDefaults={{ recordType: "event" }}
+            fields={[
+              {
+                name: "eventType",
+                label: "Event type",
+                type: "select",
+                options: [
+                  { label: "Maturity", value: "maturity" },
+                  { label: "Covenant test", value: "covenant_test" },
+                  { label: "Payment due", value: "payment_due" },
+                  { label: "Calendar", value: "calendar" }
+                ]
+              },
+              { name: "title", label: "Title", placeholder: "Q2 covenant review" },
+              { name: "dueDate", label: "Due date", type: "date" }
+            ]}
           />
           <ActionCard
             title="Generate cash snapshot"

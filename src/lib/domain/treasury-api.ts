@@ -269,6 +269,33 @@ const reportCreateSchema = z.object({
   periodEnd: z.string().trim().optional()
 });
 
+const liquidityCreateSchema = z.object({
+  lenderSubsidiaryId: optionalUuid,
+  borrowerSubsidiaryId: optionalUuid,
+  currencyCode: isoCurrency,
+  principalAmount: numericValue("Principal amount").positive(),
+  interestRateBps: z.coerce.number().int().min(0).default(0),
+  maturityDate: z.string().trim().optional()
+});
+
+const notificationCreateSchema = z.discriminatedUnion("recordType", [
+  z.object({
+    recordType: z.literal("notification"),
+    title: shortText("Title"),
+    body: shortText("Body"),
+    severity: z.enum(["info", "warning", "critical"]).default("info")
+  }),
+  z.object({
+    recordType: z.literal("mobile_device"),
+    deviceLabel: shortText("Device label"),
+    platform: shortText("Platform"),
+    biometricEnabled: z
+      .union([z.boolean(), z.enum(["true", "false"])])
+      .transform((value) => value === true || value === "true")
+      .default(false)
+  })
+]);
+
 export async function getAccountsPayload() {
   const context = await getTreasuryApiContext();
   const [accounts, bankRelationships, counterparties, currencyRates] = await Promise.all([
@@ -1471,6 +1498,120 @@ export async function createReportRecord(payload: unknown) {
   return { ok: true, record };
 }
 
+export async function getLiquidityPayload() {
+  const context = await getTreasuryApiContext();
+  const [loans, events] = await Promise.all([
+    selectMany(
+      context.supabase,
+      "intercompany_loans",
+      "id, lender_subsidiary_id, borrower_subsidiary_id, currency_code, principal_amount, outstanding_amount, interest_rate_bps, maturity_date, status, updated_at",
+      context.organizationId,
+      { orderBy: "updated_at", ascending: false, limit: 20 }
+    ),
+    selectMany(
+      context.supabase,
+      "treasury_events",
+      "id, event_type, title, due_date, status, related_entity_type",
+      context.organizationId,
+      { orderBy: "due_date", ascending: true, limit: 20 }
+    )
+  ]);
+
+  return { loans, events };
+}
+
+export async function createLiquidityRecord(payload: unknown) {
+  const parsed = liquidityCreateSchema.parse(payload);
+  const context = await getTreasuryApiContext();
+
+  const lenderSubsidiaryId =
+    parsed.lenderSubsidiaryId ?? (await getFirstId(context.supabase, "subsidiaries", context.organizationId));
+  const borrowerSubsidiaryId =
+    parsed.borrowerSubsidiaryId ??
+    (await getAnotherSubsidiaryId(
+      context.supabase,
+      context.organizationId,
+      lenderSubsidiaryId ? String(lenderSubsidiaryId) : undefined
+    ));
+
+  if (!lenderSubsidiaryId || !borrowerSubsidiaryId) {
+    throw new ApiError(400, "Create at least two subsidiaries before recording intercompany liquidity.");
+  }
+
+  const record = await insertOne(context.supabase, "intercompany_loans", {
+    organization_id: context.organizationId,
+    lender_subsidiary_id: lenderSubsidiaryId,
+    borrower_subsidiary_id: borrowerSubsidiaryId,
+    currency_code: parsed.currencyCode,
+    principal_amount: parsed.principalAmount,
+    outstanding_amount: parsed.principalAmount,
+    interest_rate_bps: parsed.interestRateBps,
+    maturity_date: parsed.maturityDate ?? currentDateOffset(90),
+    status: "active"
+  });
+
+  await createAuditLog(context, "liquidity.intercompany_loan_created", "intercompany_loan", String(record.id));
+  return { ok: true, record };
+}
+
+export async function getNotificationsPayload() {
+  const context = await getTreasuryApiContext();
+  const [notifications, mobileDevices] = await Promise.all([
+    selectMany(
+      context.supabase,
+      "notifications",
+      "id, title, body, severity, status, created_at",
+      context.organizationId,
+      { orderBy: "created_at", ascending: false, limit: 20 }
+    ),
+    selectMany(
+      context.supabase,
+      "mobile_devices",
+      "id, device_label, platform, biometric_enabled, last_seen_at, status, created_at, user_id",
+      context.organizationId,
+      {
+        filters: [{ column: "user_id", value: context.userId }],
+        orderBy: "created_at",
+        ascending: false,
+        limit: 10
+      }
+    )
+  ]);
+
+  return { notifications, mobileDevices };
+}
+
+export async function createNotificationRecord(payload: unknown) {
+  const parsed = notificationCreateSchema.parse(payload);
+  const context = await getTreasuryApiContext();
+
+  if (parsed.recordType === "notification") {
+    const record = await insertOne(context.supabase, "notifications", {
+      organization_id: context.organizationId,
+      user_id: context.userId,
+      channel: "in_app",
+      notification_type: "manual_alert",
+      severity: parsed.severity,
+      title: parsed.title,
+      body: parsed.body,
+      status: "queued"
+    });
+    await createAuditLog(context, "notifications.created", "notification", String(record.id), parsed.severity);
+    return { ok: true, record };
+  }
+
+  const record = await insertOne(context.supabase, "mobile_devices", {
+    organization_id: context.organizationId,
+    user_id: context.userId,
+    device_label: parsed.deviceLabel,
+    platform: parsed.platform,
+    biometric_enabled: parsed.biometricEnabled,
+    status: "active"
+  });
+  await createAuditLog(context, "mobile.device_registered", "mobile_device", String(record.id));
+  return { ok: true, record };
+}
+
 async function getTreasuryApiContext(): Promise<TreasuryApiContext> {
   const [session, supabase] = await Promise.all([getAppSession(), createSupabaseServerClient()]);
 
@@ -1552,6 +1693,22 @@ async function getLatestForecastLines(context: TreasuryApiContext) {
     String(latestForecast.id),
     { orderBy: "forecast_date", ascending: true }
   );
+}
+
+async function getAnotherSubsidiaryId(
+  supabase: SupabaseClient,
+  organizationId: string,
+  excludeId?: string
+) {
+  const subsidiaries = await selectMany(
+    supabase,
+    "subsidiaries",
+    "id",
+    organizationId,
+    { orderBy: "created_at", ascending: true, limit: 10 }
+  );
+  const alternative = subsidiaries.find((subsidiary: JsonRecord) => String(subsidiary.id) !== excludeId);
+  return alternative ? String(alternative.id) : null;
 }
 
 function buildQueryResponse(

@@ -4,7 +4,11 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SectionEmpty } from "@/components/ui/section-empty";
 import { getDashboardSnapshot } from "@/lib/domain/treasury";
-import { getRiskPayload } from "@/lib/domain/treasury-api";
+import {
+  getDebtPayload,
+  getInvestmentsPayload,
+  getRiskPayload
+} from "@/lib/domain/treasury-api";
 import { formatCurrency } from "@/lib/utils";
 
 type ExposureRecord = {
@@ -35,11 +39,51 @@ type MarketDataRecord = {
   observed_at: string;
 };
 
+type InvestmentRecord = {
+  id: string;
+  instrument_name: string;
+  investment_type: string;
+  principal_amount: number;
+  current_value: number;
+  currency_code: string;
+  maturity_date: string;
+  esg_label: string | null;
+  status: string;
+};
+
+type DebtFacilityRecord = {
+  id: string;
+  lender_name: string;
+  facility_type: string;
+  currency_code: string;
+  committed_amount: number;
+  drawn_amount: number;
+  maturity_date: string;
+  status: string;
+};
+
+type CovenantTestRecord = {
+  id: string;
+  metric_name: string;
+  threshold_value: number;
+  actual_value: number;
+  test_date: string;
+  status: string;
+};
+
 export default async function RiskPage() {
-  const [snapshot, riskPayload] = await Promise.all([getDashboardSnapshot(), getRiskPayload()]);
+  const [snapshot, riskPayload, investmentsPayload, debtPayload] = await Promise.all([
+    getDashboardSnapshot(),
+    getRiskPayload(),
+    getInvestmentsPayload(),
+    getDebtPayload()
+  ]);
   const exposures = riskPayload.exposures as ExposureRecord[];
   const hedges = riskPayload.hedges as HedgeRecord[];
   const marketData = riskPayload.marketData as MarketDataRecord[];
+  const investments = investmentsPayload.investments as InvestmentRecord[];
+  const facilities = debtPayload.facilities as DebtFacilityRecord[];
+  const covenantTests = debtPayload.covenantTests as CovenantTestRecord[];
 
   return (
     <>
@@ -215,6 +259,117 @@ export default async function RiskPage() {
         </Card>
       </section>
 
+      <section className="mt-6 grid gap-6 xl:grid-cols-[1fr_1fr]">
+        <Card>
+          <CardHeader>
+            <CardTitle>Investment portfolio</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {investments.length ? (
+              investments.map((investment) => (
+                <div
+                  key={investment.id}
+                  className="rounded-[1.35rem] border border-border/70 bg-white/68 p-4"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="font-medium">{investment.instrument_name}</p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {investment.investment_type} · matures {investment.maturity_date}
+                      </p>
+                    </div>
+                    <Badge variant={investment.status === "active" ? "success" : "secondary"}>
+                      {investment.status}
+                    </Badge>
+                  </div>
+                  <div className="mt-4 grid gap-4 md:grid-cols-2">
+                    <div className="rounded-[1.2rem] bg-background/80 p-4">
+                      <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Principal</p>
+                      <p className="mt-2 font-semibold">
+                        {formatCurrency(investment.principal_amount, investment.currency_code)}
+                      </p>
+                    </div>
+                    <div className="rounded-[1.2rem] bg-background/80 p-4">
+                      <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Current value</p>
+                      <p className="mt-2 font-semibold">
+                        {formatCurrency(investment.current_value, investment.currency_code)}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="mt-3 text-sm text-muted-foreground">
+                    ESG label: {investment.esg_label ?? "Not tagged"}
+                  </p>
+                </div>
+              ))
+            ) : (
+              <SectionEmpty
+                title="No investment placements"
+                description="Record money market placements, deposits, or paper to track short-term investing."
+              />
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Debt and covenants</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {facilities.length ? (
+              facilities.map((facility) => (
+                <div
+                  key={facility.id}
+                  className="rounded-[1.35rem] border border-border/70 bg-white/68 p-4"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="font-medium">{facility.lender_name}</p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {facility.facility_type} · matures {facility.maturity_date}
+                      </p>
+                    </div>
+                    <Badge variant={facility.status === "active" ? "success" : "secondary"}>
+                      {facility.status}
+                    </Badge>
+                  </div>
+                  <p className="mt-3 text-sm text-muted-foreground">
+                    Drawn {formatCurrency(facility.drawn_amount, facility.currency_code)} of{" "}
+                    {formatCurrency(facility.committed_amount, facility.currency_code)}
+                  </p>
+                </div>
+              ))
+            ) : (
+              <SectionEmpty
+                title="No debt facilities"
+                description="Add facilities and covenant tests to monitor funding obligations and breach risk."
+              />
+            )}
+
+            {covenantTests.length ? (
+              covenantTests.slice(0, 4).map((test) => (
+                <div
+                  key={test.id}
+                  className="rounded-[1.35rem] border border-border/70 bg-white/68 p-4"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="font-medium">{test.metric_name}</p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Threshold {test.threshold_value} · actual {test.actual_value}
+                      </p>
+                    </div>
+                    <Badge variant={test.status === "breach" ? "destructive" : "success"}>
+                      {test.status}
+                    </Badge>
+                  </div>
+                  <p className="mt-3 text-sm text-muted-foreground">{test.test_date}</p>
+                </div>
+              ))
+            ) : null}
+          </CardContent>
+        </Card>
+      </section>
+
       <section className="mt-6 grid gap-6 xl:grid-cols-3">
         <ActionCard
           title="Measure exposure"
@@ -290,6 +445,69 @@ export default async function RiskPage() {
             { name: "instrumentType", label: "Instrument type", placeholder: "fx_spot" },
             { name: "symbol", label: "Symbol", placeholder: "USD/EUR" },
             { name: "valueNumeric", label: "Value", type: "number", placeholder: "0.92" }
+          ]}
+        />
+        <ActionCard
+          title="Record investment"
+          description="Track a short-term placement or deposit and optionally tag it for ESG reporting."
+          endpoint="/api/investments"
+          submitLabel="Create investment"
+          fields={[
+            { name: "instrumentName", label: "Instrument name", placeholder: "Prime MMF" },
+            {
+              name: "investmentType",
+              label: "Investment type",
+              type: "select",
+              options: [
+                { label: "Money market", value: "money_market" },
+                { label: "Deposit", value: "deposit" },
+                { label: "Commercial paper", value: "commercial_paper" }
+              ]
+            },
+            {
+              name: "currencyCode",
+              label: "Currency",
+              type: "select",
+              options: [
+                { label: "USD", value: "USD" },
+                { label: "EUR", value: "EUR" },
+                { label: "GBP", value: "GBP" }
+              ]
+            },
+            { name: "principalAmount", label: "Principal amount", type: "number", placeholder: "2000000" },
+            { name: "esgLabel", label: "ESG label", placeholder: "Green treasury reserve" }
+          ]}
+        />
+        <ActionCard
+          title="Record debt or covenant"
+          description="Add a facility or a covenant test to keep leverage and liquidity controls visible."
+          endpoint="/api/debt"
+          submitLabel="Create facility"
+          payloadDefaults={{ recordType: "facility" }}
+          fields={[
+            { name: "lenderName", label: "Lender", placeholder: "HSBC" },
+            {
+              name: "facilityType",
+              label: "Facility type",
+              type: "select",
+              options: [
+                { label: "Revolver", value: "revolver" },
+                { label: "Term loan", value: "term_loan" },
+                { label: "Overdraft", value: "overdraft" }
+              ]
+            },
+            {
+              name: "currencyCode",
+              label: "Currency",
+              type: "select",
+              options: [
+                { label: "USD", value: "USD" },
+                { label: "EUR", value: "EUR" },
+                { label: "GBP", value: "GBP" }
+              ]
+            },
+            { name: "committedAmount", label: "Committed amount", type: "number", placeholder: "5000000" },
+            { name: "drawnAmount", label: "Drawn amount", type: "number", defaultValue: "0" }
           ]}
         />
       </section>

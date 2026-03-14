@@ -2,10 +2,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "@/lib/api/errors";
 
-const { getAppSessionMock, getDashboardSnapshotMock, getReportsPayloadMock } = vi.hoisted(() => ({
+const {
+  getAppSessionMock,
+  getDashboardSnapshotMock,
+  getReportsPayloadMock,
+  getNotificationsPayloadMock
+} = vi.hoisted(() => ({
   getAppSessionMock: vi.fn(),
   getDashboardSnapshotMock: vi.fn(),
-  getReportsPayloadMock: vi.fn()
+  getReportsPayloadMock: vi.fn(),
+  getNotificationsPayloadMock: vi.fn()
 }));
 
 vi.mock("@/lib/auth", () => ({
@@ -17,7 +23,8 @@ vi.mock("@/lib/domain/treasury", () => ({
 }));
 
 vi.mock("@/lib/domain/treasury-api", () => ({
-  getReportsPayload: getReportsPayloadMock
+  getReportsPayload: getReportsPayloadMock,
+  getNotificationsPayload: getNotificationsPayloadMock
 }));
 
 import { GET as getSession } from "@/app/api/auth/session/route";
@@ -47,6 +54,7 @@ describe("workspace API routes", () => {
     getAppSessionMock.mockResolvedValue(session);
     getDashboardSnapshotMock.mockResolvedValue(snapshot);
     getReportsPayloadMock.mockResolvedValue({ reports: snapshot.reports });
+    getNotificationsPayloadMock.mockResolvedValue({ notifications: snapshot.alerts });
   });
 
   it("returns the current auth session", async () => {
@@ -68,6 +76,7 @@ describe("workspace API routes", () => {
   it("protects treasury workspace data routes when unauthenticated", async () => {
     getAppSessionMock.mockResolvedValue(null);
     getReportsPayloadMock.mockRejectedValue(new ApiError(401, "Unauthorized"));
+    getNotificationsPayloadMock.mockRejectedValue(new ApiError(401, "Unauthorized"));
 
     const [positions, reports, notifications] = await Promise.all([
       getPositions(),
