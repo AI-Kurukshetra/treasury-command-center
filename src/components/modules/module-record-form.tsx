@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { startTransition, useState } from "react";
+import { useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import type { ModuleField } from "@/types/modules";
@@ -13,6 +13,7 @@ type ModuleRecordFormProps = {
 
 export function ModuleRecordForm({ slug, fields }: ModuleRecordFormProps) {
   const router = useRouter();
+  const formRef = useRef<HTMLFormElement>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -23,6 +24,9 @@ export function ModuleRecordForm({ slug, fields }: ModuleRecordFormProps) {
     setSuccess(null);
 
     const payload = Object.fromEntries(formData.entries());
+    const createdLabel = fields
+      .map((field) => payload[field.name])
+      .find((value) => typeof value === "string" && value.trim().length > 0);
 
     const response = await fetch(`/api/modules/${slug}/records`, {
       method: "POST",
@@ -40,21 +44,23 @@ export function ModuleRecordForm({ slug, fields }: ModuleRecordFormProps) {
       return;
     }
 
-    setSuccess("Record created.");
-    startTransition(() => {
-      router.refresh();
-    });
+    setSuccess(
+      typeof createdLabel === "string" ? `Record created. ${createdLabel}` : "Record created."
+    );
+    formRef.current?.reset();
+    router.refresh();
     setPending(false);
   }
 
   return (
     <form
+      ref={formRef}
       action={onSubmit}
-      className="space-y-4 rounded-2xl border border-border bg-card/70 p-5"
+      className="space-y-5 rounded-[1.8rem] border border-white/70 bg-white/78 p-6 shadow-[0_24px_60px_rgba(17,30,64,0.08)]"
     >
       <div>
-        <h3 className="text-lg font-semibold">Create module record</h3>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <h3 className="font-display text-2xl font-semibold">Create module record</h3>
+        <p className="mt-2 text-sm leading-6 text-muted-foreground">
           Submit a validated sample record for this module.
         </p>
       </div>
@@ -67,14 +73,14 @@ export function ModuleRecordForm({ slug, fields }: ModuleRecordFormProps) {
               name={field.name}
               required
               placeholder={field.placeholder}
-              className="min-h-24 rounded-md border border-input bg-background px-3 py-2 text-sm outline-none ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+              className="min-h-28 rounded-2xl border border-input/80 bg-white/80 px-4 py-3 text-sm outline-none ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
             />
           ) : field.type === "select" ? (
             <select
               name={field.name}
               required
               defaultValue=""
-              className="h-10 rounded-md border border-input bg-background px-3 text-sm outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
+              className="h-11 rounded-2xl border border-input/80 bg-white/80 px-4 text-sm outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
             >
               <option value="" disabled>
                 Select {field.label.toLowerCase()}
@@ -92,7 +98,7 @@ export function ModuleRecordForm({ slug, fields }: ModuleRecordFormProps) {
               required
               step={field.step}
               placeholder={field.placeholder}
-              className="h-10 rounded-md border border-input bg-background px-3 text-sm outline-none ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+              className="h-11 rounded-2xl border border-input/80 bg-white/80 px-4 text-sm outline-none ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
             />
           )}
         </label>

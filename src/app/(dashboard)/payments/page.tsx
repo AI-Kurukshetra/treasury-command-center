@@ -7,6 +7,7 @@ import { formatCurrency } from "@/lib/utils";
 
 export default async function PaymentsPage() {
   const snapshot = await getDashboardSnapshot();
+  const atRiskCount = snapshot.payments.filter((payment) => payment.status === "at-risk").length;
 
   return (
     <>
@@ -14,60 +15,82 @@ export default async function PaymentsPage() {
         eyebrow="Payments"
         title="Approval and release queue"
         description="View submitted items, remaining approval steps, and payments that need escalation before release."
+        meta={["Approval routing", "Release watch", "Escalation aware"]}
       />
-      <Card>
-        <CardHeader>
-          <CardTitle>Current queue</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {snapshot.payments.length ? (
-            snapshot.payments.map((payment) => (
-              <div key={payment.id} className="rounded-xl border border-border bg-background/70 p-5">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <p className="font-semibold">{payment.beneficiary}</p>
-                    <p className="text-sm text-muted-foreground">{payment.id}</p>
+      <section className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
+        <Card className="dark-panel border-slate-800 text-white">
+          <CardHeader>
+            <CardTitle className="text-white">Queue signal</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-2">
+            <div className="rounded-[1.35rem] border border-white/10 bg-white/8 p-5">
+              <p className="text-xs uppercase tracking-[0.18em] text-white/55">Visible items</p>
+              <p className="mt-3 font-display text-4xl font-semibold">{snapshot.payments.length}</p>
+            </div>
+            <div className="rounded-[1.35rem] border border-white/10 bg-white/8 p-5">
+              <p className="text-xs uppercase tracking-[0.18em] text-white/55">At risk</p>
+              <p className="mt-3 font-display text-4xl font-semibold">{atRiskCount}</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Current queue</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {snapshot.payments.length ? (
+              snapshot.payments.map((payment) => (
+                <div
+                  key={payment.id}
+                  className="rounded-[1.5rem] border border-border/70 bg-white/68 p-5"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="font-display text-xl font-semibold">{payment.beneficiary}</p>
+                      <p className="mt-1 text-sm text-muted-foreground">{payment.id}</p>
+                    </div>
+                    <Badge
+                      variant={
+                        payment.status === "approved"
+                          ? "success"
+                          : payment.status === "at-risk"
+                            ? "destructive"
+                            : "outline"
+                      }
+                    >
+                      {payment.status}
+                    </Badge>
                   </div>
-                  <Badge
-                    variant={
-                      payment.status === "approved"
-                        ? "success"
-                        : payment.status === "at-risk"
-                          ? "destructive"
-                          : "outline"
-                    }
-                  >
-                    {payment.status}
-                  </Badge>
+                  <div className="mt-5 grid gap-4 md:grid-cols-3">
+                    <div className="rounded-[1.2rem] bg-background/80 p-4">
+                      <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Amount</p>
+                      <p className="mt-2 font-display text-2xl font-semibold">
+                        {formatCurrency(payment.amount, payment.currency)}
+                      </p>
+                    </div>
+                    <div className="rounded-[1.2rem] bg-background/80 p-4">
+                      <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Due date</p>
+                      <p className="mt-2 text-lg font-semibold">{payment.dueDate}</p>
+                    </div>
+                    <div className="rounded-[1.2rem] bg-background/80 p-4">
+                      <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                        Remaining approvals
+                      </p>
+                      <p className="mt-2 text-lg font-semibold">{payment.approvalsRemaining}</p>
+                    </div>
+                  </div>
                 </div>
-                <div className="mt-4 grid gap-4 text-sm md:grid-cols-3">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Amount</p>
-                    <p className="mt-2 font-semibold">
-                      {formatCurrency(payment.amount, payment.currency)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Due date</p>
-                    <p className="mt-2 font-semibold">{payment.dueDate}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                      Remaining approvals
-                    </p>
-                    <p className="mt-2 font-semibold">{payment.approvalsRemaining}</p>
-                  </div>
-                </div>
-              </div>
-            ))
-          ) : (
-            <SectionEmpty
-              title="No payment items in queue"
-              description="Create or import payment instructions to populate the approval and release queue."
-            />
-          )}
-        </CardContent>
-      </Card>
+              ))
+            ) : (
+              <SectionEmpty
+                title="No payment items in queue"
+                description="Create or import payment instructions to populate the approval and release queue."
+              />
+            )}
+          </CardContent>
+        </Card>
+      </section>
     </>
   );
 }

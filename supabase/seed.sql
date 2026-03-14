@@ -42,7 +42,7 @@ begin
       'authenticated',
       'authenticated',
       'treasurer@local.test',
-      crypt('Treasury123!', gen_salt('bf')),
+      extensions.crypt('Treasury123!', extensions.gen_salt('bf')),
       timezone('utc', now()),
       timezone('utc', now()),
       '',

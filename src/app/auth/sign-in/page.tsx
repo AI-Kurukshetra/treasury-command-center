@@ -15,20 +15,22 @@ export default async function SignInPage() {
   }
 
   return (
-    <main className="container flex min-h-[calc(100vh-4rem)] items-center justify-center py-10">
-      <div className="grid w-full max-w-5xl gap-8 lg:grid-cols-[1fr_420px]">
-        <div className="rounded-3xl border border-border/70 bg-card/80 p-10 shadow-panel">
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-primary">
+    <main className="container flex min-h-[calc(100vh-5rem)] items-center justify-center py-12">
+      <div className="grid w-full max-w-6xl gap-8 lg:grid-cols-[1.05fr_0.95fr]">
+        <div className="dark-panel rounded-[2.2rem] border border-slate-800 p-10 text-white shadow-[0_40px_110px_rgba(12,20,45,0.24)]">
+          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-white/60">
             Treasury access
           </p>
-          <h1 className="mt-5 text-4xl font-semibold tracking-tight">Sign in to the workspace</h1>
-          <p className="mt-4 max-w-xl text-muted-foreground">
+          <h1 className="mt-5 font-display text-5xl font-semibold tracking-tight">
+            Sign in to the workspace
+          </h1>
+          <p className="mt-4 max-w-xl text-white/72">
             Access the live treasury workspace using Supabase authentication. Protected routes use
-            cookie-based SSR sessions, middleware refresh, and organization-scoped access control.
+            SSR sessions, middleware refresh, and organization-scoped access control.
           </p>
-          <div className="mt-10 grid gap-4 rounded-2xl border border-dashed border-border bg-muted/30 p-6">
-            <p className="text-sm font-medium">Implementation notes</p>
-            <ul className="space-y-3 text-sm text-muted-foreground">
+          <div className="mt-10 grid gap-4 rounded-[1.8rem] border border-white/10 bg-white/8 p-6">
+            <p className="text-sm font-medium text-white">Operational notes</p>
+            <ul className="space-y-3 text-sm text-white/70">
               <li>Supabase SSR auth is the only supported runtime mode.</li>
               <li>Protected dashboard routes require an authenticated Supabase user.</li>
               <li>Organization membership drives tenant-scoped data access.</li>
@@ -36,7 +38,7 @@ export default async function SignInPage() {
           </div>
         </div>
 
-        <Card>
+        <Card className="self-center">
           <CardHeader>
             <CardTitle>Supabase sign in</CardTitle>
             <CardDescription>
@@ -53,7 +55,7 @@ export default async function SignInPage() {
               <SignInForm />
             )}
 
-            <div className="rounded-xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
+            <div className="rounded-[1.35rem] border border-border/70 bg-background/80 p-4 text-sm text-muted-foreground">
               Recommended setup: create one organization, one active membership, one profile row,
               and at least one cash snapshot so the protected workspace renders live data after
               login.

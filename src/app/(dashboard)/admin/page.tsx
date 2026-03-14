@@ -23,6 +23,7 @@ export default function AdminPage() {
         eyebrow="Administration"
         title="Platform controls"
         description="Configure the tenant, access model, and policy controls that govern treasury operations."
+        meta={["Tenant setup", "Access model", "Control policies"]}
       />
       <div className="grid gap-6 md:grid-cols-3">
         {adminSections.map((section) => (
@@ -31,7 +32,7 @@ export default function AdminPage() {
               <CardTitle>{section.title}</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm leading-6 text-muted-foreground">{section.detail}</p>
+              <p className="text-sm leading-7 text-muted-foreground">{section.detail}</p>
             </CardContent>
           </Card>
         ))}

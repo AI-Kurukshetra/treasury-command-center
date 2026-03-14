@@ -4,7 +4,9 @@ test("landing page renders and sign-in page is reachable", async ({ page }) => {
   await page.goto("/", { waitUntil: "domcontentloaded" });
 
   await expect(
-    page.getByRole("heading", { name: "Replace spreadsheet treasury with a live command center." })
+    page.getByRole("heading", {
+      name: /Treasury software that looks and behaves like a control room/i
+    })
   ).toBeVisible();
 
   await page.getByRole("link", { name: "Enter the workspace" }).click();

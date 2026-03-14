@@ -35,17 +35,17 @@ export default async function ModuleDetailPage({
       <section className="grid gap-4 md:grid-cols-3">
         {moduleDetail.metrics.map((metric) => (
           <Card key={metric.label}>
-            <CardContent className="space-y-2 p-5">
+            <CardContent className="space-y-2 p-6">
               <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
                 {metric.label}
               </p>
               <p
                 className={
                   metric.tone === "positive"
-                    ? "text-2xl font-semibold text-emerald-600"
+                    ? "font-display text-3xl font-semibold text-emerald-600"
                     : metric.tone === "warning"
-                      ? "text-2xl font-semibold text-amber-600"
-                      : "text-2xl font-semibold"
+                      ? "font-display text-3xl font-semibold text-amber-600"
+                      : "font-display text-3xl font-semibold"
                 }
               >
                 {metric.value}

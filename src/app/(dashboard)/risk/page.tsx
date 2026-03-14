@@ -14,6 +14,7 @@ export default async function RiskPage() {
         eyebrow="Risk"
         title="Exposure and risk monitoring"
         description="Track open currency exposure, hedge coverage, and current risk signals that influence treasury actions."
+        meta={["Exposure watch", "Hedge posture", "Alert driven"]}
       />
       <div className="grid gap-6 xl:grid-cols-[1fr_0.9fr]">
         <Card>
@@ -25,27 +26,30 @@ export default async function RiskPage() {
               snapshot.exposures.map((exposure) => (
                 <div
                   key={exposure.currency}
-                  className="grid gap-4 rounded-xl border border-border bg-background/70 p-5 md:grid-cols-4"
+                  className="rounded-[1.5rem] border border-border/70 bg-white/68 p-5"
                 >
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                      Currency
+                  <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Currency</p>
+                      <p className="mt-2 font-display text-2xl font-semibold">{exposure.currency}</p>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Open {formatCurrency(exposure.open, exposure.currency)}
                     </p>
-                    <p className="mt-2 text-xl font-semibold">{exposure.currency}</p>
                   </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Gross</p>
-                    <p className="mt-2 font-semibold">{formatCurrency(exposure.gross)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                      Hedged
-                    </p>
-                    <p className="mt-2 font-semibold">{formatCurrency(exposure.hedged)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Open</p>
-                    <p className="mt-2 font-semibold">{formatCurrency(exposure.open)}</p>
+                  <div className="mt-5 grid gap-4 md:grid-cols-3">
+                    <div className="rounded-[1.2rem] bg-background/80 p-4">
+                      <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Gross</p>
+                      <p className="mt-2 font-semibold">{formatCurrency(exposure.gross)}</p>
+                    </div>
+                    <div className="rounded-[1.2rem] bg-background/80 p-4">
+                      <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Hedged</p>
+                      <p className="mt-2 font-semibold">{formatCurrency(exposure.hedged)}</p>
+                    </div>
+                    <div className="rounded-[1.2rem] bg-background/80 p-4">
+                      <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Open</p>
+                      <p className="mt-2 font-semibold">{formatCurrency(exposure.open)}</p>
+                    </div>
                   </div>
                 </div>
               ))
@@ -58,29 +62,30 @@ export default async function RiskPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="dark-panel border-slate-800 text-white">
           <CardHeader>
-            <CardTitle>Risk watchlist</CardTitle>
+            <CardTitle className="text-white">Risk watchlist</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {snapshot.alerts.length ? (
               snapshot.alerts.map((alert) => (
-                <div key={alert.id} className="rounded-xl border border-border bg-background/70 p-4">
+                <div key={alert.id} className="rounded-[1.4rem] border border-white/10 bg-white/8 p-4">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="font-medium">{alert.title}</p>
+                    <p className="font-display text-lg font-semibold">{alert.title}</p>
                     <Badge
                       variant={
                         alert.severity === "critical"
                           ? "destructive"
                           : alert.severity === "warning"
                             ? "warning"
-                            : "default"
+                            : "outline"
                       }
+                      className={alert.severity === "info" ? "border-white/15 bg-white/10 text-white/80" : ""}
                     >
                       {alert.severity}
                     </Badge>
                   </div>
-                  <p className="mt-2 text-sm text-muted-foreground">{alert.detail}</p>
+                  <p className="mt-3 text-sm leading-6 text-white/72">{alert.detail}</p>
                 </div>
               ))
             ) : (

@@ -1,4 +1,11 @@
-import { AlertTriangle, ArrowRightLeft, Landmark, ShieldCheck } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowRightLeft,
+  Landmark,
+  Radar,
+  ReceiptText,
+  ShieldCheck
+} from "lucide-react";
 
 import { CashTrendChart } from "@/components/charts/cash-trend-chart";
 import { MetricCard } from "@/components/dashboard/metric-card";
@@ -19,8 +26,8 @@ export default async function DashboardPage() {
       <PageHeader
         eyebrow="Executive View"
         title="Global treasury overview"
-        description="Monitor cash, forecast quality, payment throughput, and risk posture from a single operating surface."
-        meta={["Real-time view", "Audit ready", "Multi-entity"]}
+        description="A redesigned executive surface for cash visibility, forecast confidence, approval routing, connector health, and risk posture."
+        meta={["Live operating view", "Policy-aware", "Multi-entity"]}
       />
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -29,7 +36,7 @@ export default async function DashboardPage() {
 
           return (
             <div key={stat.label} className="relative">
-              <div className="absolute right-5 top-5 rounded-xl bg-primary/10 p-2 text-primary">
+              <div className="absolute right-6 top-6 rounded-[1rem] bg-primary/8 p-2.5 text-primary">
                 <Icon className="h-5 w-5" />
               </div>
               <MetricCard item={stat} />
@@ -38,15 +45,16 @@ export default async function DashboardPage() {
         })}
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[1.3fr_0.7fr]">
-        <Card>
-          <CardHeader>
-            <CardTitle>13-week liquidity trend</CardTitle>
+      <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+        <Card className="overflow-hidden">
+          <CardHeader className="border-b border-border/60 pb-5">
+            <CardTitle>13-week liquidity curve</CardTitle>
             <CardDescription>
-              Forecasted and actual treasury movement in reporting currency.
+              Actual and forecast movement in reporting currency with a cleaner signal-to-noise
+              ratio.
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-6">
             {snapshot.forecasts.length ? (
               <CashTrendChart data={snapshot.forecasts} />
             ) : (
@@ -58,33 +66,39 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="dark-panel border-slate-800 text-white">
           <CardHeader>
-            <CardTitle>Critical alerts</CardTitle>
-            <CardDescription>Items that need immediate treasury attention.</CardDescription>
+            <CardTitle className="text-white">Critical alert rail</CardTitle>
+            <CardDescription className="text-white/70">
+              Escalations and exceptions requiring treasury attention right now.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {snapshot.alerts.length ? (
               snapshot.alerts.map((alert) => (
-                <div key={alert.id} className="rounded-xl border border-border bg-muted/40 p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="font-medium">{alert.title}</p>
+                <div key={alert.id} className="rounded-[1.4rem] border border-white/10 bg-white/8 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="font-display text-lg font-semibold">{alert.title}</p>
                     <Badge
                       variant={
                         alert.severity === "critical"
                           ? "destructive"
                           : alert.severity === "warning"
                             ? "warning"
-                            : "default"
+                            : "outline"
+                      }
+                      className={
+                        alert.severity === "info" ? "border-white/15 bg-white/10 text-white/80" : ""
                       }
                     >
                       {alert.severity}
                     </Badge>
                   </div>
-                  <p className="mt-2 text-sm text-muted-foreground">{alert.detail}</p>
-                  <p className="mt-3 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+                  <p className="mt-3 text-sm leading-6 text-white/72">{alert.detail}</p>
+                  <div className="mt-4 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-secondary">
+                    <Radar className="h-3.5 w-3.5" />
                     {alert.action}
-                  </p>
+                  </div>
                 </div>
               ))
             ) : (
@@ -97,40 +111,26 @@ export default async function DashboardPage() {
         </Card>
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[1fr_1fr]">
+      <section className="grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">
         <Card>
           <CardHeader>
-            <CardTitle>Cash position by entity</CardTitle>
-            <CardDescription>Current and projected liquidity posture by operating unit.</CardDescription>
+            <CardTitle>Cash posture by entity</CardTitle>
+            <CardDescription>
+              Current and projected liquidity position for the entities that matter today.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {snapshot.positions.length ? (
               snapshot.positions.map((position) => (
                 <div
                   key={`${position.entity}-${position.bank}`}
-                  className="grid gap-3 rounded-xl border border-border bg-background/70 p-4 md:grid-cols-[1.2fr_0.8fr_0.8fr_auto]"
+                  className="rounded-[1.5rem] border border-border/70 bg-white/68 p-5"
                 >
-                  <div>
-                    <p className="font-medium">{position.entity}</p>
-                    <p className="text-sm text-muted-foreground">{position.bank}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                      Available
-                    </p>
-                    <p className="font-semibold">
-                      {formatCurrency(position.available, position.currency)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                      Projected
-                    </p>
-                    <p className="font-semibold">
-                      {formatCurrency(position.projected, position.currency)}
-                    </p>
-                  </div>
-                  <div className="flex items-center">
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                      <p className="font-display text-xl font-semibold">{position.entity}</p>
+                      <p className="mt-1 text-sm text-muted-foreground">{position.bank}</p>
+                    </div>
                     <Badge
                       variant={
                         position.status === "critical"
@@ -142,6 +142,24 @@ export default async function DashboardPage() {
                     >
                       {position.status}
                     </Badge>
+                  </div>
+                  <div className="mt-5 grid gap-4 md:grid-cols-2">
+                    <div className="rounded-[1.2rem] bg-background/80 p-4">
+                      <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                        Available
+                      </p>
+                      <p className="mt-2 font-display text-2xl font-semibold">
+                        {formatCurrency(position.available, position.currency)}
+                      </p>
+                    </div>
+                    <div className="rounded-[1.2rem] bg-background/80 p-4">
+                      <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                        Projected
+                      </p>
+                      <p className="mt-2 font-display text-2xl font-semibold">
+                        {formatCurrency(position.projected, position.currency)}
+                      </p>
+                    </div>
                   </div>
                 </div>
               ))
@@ -157,16 +175,18 @@ export default async function DashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle>Approval queue</CardTitle>
-            <CardDescription>Payments approaching release or escalation thresholds.</CardDescription>
+            <CardDescription>
+              Release-ready items, escalations, and bottlenecks across the payment flow.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {snapshot.payments.length ? (
               snapshot.payments.map((payment) => (
-                <div key={payment.id} className="rounded-xl border border-border bg-background/70 p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
+                <div key={payment.id} className="rounded-[1.5rem] border border-border/70 bg-white/68 p-5">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <p className="font-medium">{payment.beneficiary}</p>
-                      <p className="text-sm text-muted-foreground">{payment.id}</p>
+                      <p className="font-display text-xl font-semibold">{payment.beneficiary}</p>
+                      <p className="mt-1 text-sm text-muted-foreground">{payment.id}</p>
                     </div>
                     <Badge
                       variant={
@@ -180,12 +200,25 @@ export default async function DashboardPage() {
                       {payment.status}
                     </Badge>
                   </div>
-                  <div className="mt-4 flex items-center justify-between text-sm">
-                    <span>{formatCurrency(payment.amount, payment.currency)}</span>
-                    <span className="text-muted-foreground">
-                      {payment.approvalsRemaining} approvals remaining
-                    </span>
+                  <div className="mt-5 grid gap-4 md:grid-cols-2">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                        Amount
+                      </p>
+                      <p className="mt-2 font-display text-2xl font-semibold">
+                        {formatCurrency(payment.amount, payment.currency)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                        Due date
+                      </p>
+                      <p className="mt-2 text-base font-semibold">{payment.dueDate}</p>
+                    </div>
                   </div>
+                  <p className="mt-4 text-sm text-muted-foreground">
+                    {payment.approvalsRemaining} approvals remaining before release.
+                  </p>
                 </div>
               ))
             ) : (
@@ -194,6 +227,117 @@ export default async function DashboardPage() {
                 description="Submitted and approved payment items will appear here once payment workflows are active."
               />
             )}
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="grid gap-6 xl:grid-cols-3">
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-[1rem] bg-primary/10 text-primary">
+                <ShieldCheck className="h-5 w-5" />
+              </div>
+              <div>
+                <CardTitle>FX exposure posture</CardTitle>
+                <CardDescription>Open versus hedged exposure by major currency.</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {snapshot.exposures.map((exposure) => (
+              <div
+                key={exposure.currency}
+                className="rounded-[1.35rem] border border-border/70 bg-white/68 p-4"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <p className="font-display text-xl font-semibold">{exposure.currency}</p>
+                  <p className="text-sm text-muted-foreground">
+                    Open {formatCurrency(exposure.open, exposure.currency)}
+                  </p>
+                </div>
+                <div className="mt-4 h-3 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-primary"
+                    style={{ width: `${(exposure.hedged / exposure.gross) * 100}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-[1rem] bg-secondary text-secondary-foreground">
+                <ReceiptText className="h-5 w-5" />
+              </div>
+              <div>
+                <CardTitle>Reporting output</CardTitle>
+                <CardDescription>Generated packs and queued board-facing deliverables.</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {snapshot.reports.map((report) => (
+              <div
+                key={report.id}
+                className="rounded-[1.35rem] border border-border/70 bg-white/68 p-4"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-display text-lg font-semibold">{report.title}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">{report.type}</p>
+                  </div>
+                  <Badge variant={report.status === "ready" ? "success" : "warning"}>
+                    {report.status}
+                  </Badge>
+                </div>
+                <p className="mt-4 text-sm text-muted-foreground">{report.generatedAt}</p>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-[1rem] bg-accent text-accent-foreground">
+                <ArrowRightLeft className="h-5 w-5" />
+              </div>
+              <div>
+                <CardTitle>Integration watch</CardTitle>
+                <CardDescription>Provider status and the last known synchronization signal.</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {snapshot.integrations.map((integration) => (
+              <div
+                key={integration.provider}
+                className="rounded-[1.35rem] border border-border/70 bg-white/68 p-4"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-display text-lg font-semibold">{integration.provider}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">{integration.type}</p>
+                  </div>
+                  <Badge
+                    variant={
+                      integration.status === "healthy"
+                        ? "success"
+                        : integration.status === "error"
+                          ? "destructive"
+                          : "warning"
+                    }
+                  >
+                    {integration.status}
+                  </Badge>
+                </div>
+                <p className="mt-4 text-sm text-muted-foreground">{integration.lastSync}</p>
+              </div>
+            ))}
           </CardContent>
         </Card>
       </section>
