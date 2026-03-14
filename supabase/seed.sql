@@ -9,7 +9,77 @@ begin
   limit 1;
 
   if seeded_user_id is null then
-    raise exception 'Missing auth user treasurer@local.test. Create the user before running seed.sql.';
+    seeded_user_id := '0062bd80-358c-4548-822c-a5cdea728a0e';
+
+    insert into auth.users (
+      instance_id,
+      id,
+      aud,
+      role,
+      email,
+      encrypted_password,
+      email_confirmed_at,
+      last_sign_in_at,
+      raw_app_meta_data,
+      raw_user_meta_data,
+      created_at,
+      updated_at,
+      is_sso_user,
+      is_anonymous
+    )
+    values (
+      '00000000-0000-0000-0000-000000000000',
+      seeded_user_id,
+      'authenticated',
+      'authenticated',
+      'treasurer@local.test',
+      crypt('Treasury123!', gen_salt('bf')),
+      timezone('utc', now()),
+      timezone('utc', now()),
+      '{"provider":"email","providers":["email"]}'::jsonb,
+      '{"role":"Treasury Admin","full_name":"Local Treasurer","email_verified":true,"organization_name":"Atlas Treasury Group"}'::jsonb,
+      timezone('utc', now()),
+      timezone('utc', now()),
+      false,
+      false
+    );
+  end if;
+
+  insert into auth.identities (
+    provider_id,
+    user_id,
+    identity_data,
+    provider,
+    last_sign_in_at,
+    created_at,
+    updated_at
+  )
+  values (
+    seeded_user_id::text,
+    seeded_user_id,
+    jsonb_build_object(
+      'sub',
+      seeded_user_id::text,
+      'email',
+      'treasurer@local.test',
+      'email_verified',
+      true,
+      'phone_verified',
+      false
+    ),
+    'email',
+    timezone('utc', now()),
+    timezone('utc', now()),
+    timezone('utc', now())
+  )
+  on conflict (provider_id, provider) do update
+  set
+    identity_data = excluded.identity_data,
+    last_sign_in_at = excluded.last_sign_in_at,
+    updated_at = excluded.updated_at;
+
+  if seeded_user_id is null then
+    raise exception 'Unable to create auth user treasurer@local.test during seed.';
   end if;
 
   insert into public.organizations (
