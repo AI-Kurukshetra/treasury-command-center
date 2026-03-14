@@ -9,3 +9,5 @@ coverage
 *.log
 tsconfig.tsbuildinfo
 .codex-config*.toml
+supabase/.branches
+supabase/.temp
