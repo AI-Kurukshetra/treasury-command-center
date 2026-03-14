@@ -238,6 +238,37 @@ const adminCreateSchema = z.discriminatedUnion("recordType", [
   })
 ]);
 
+const dashboardCreateSchema = z.discriminatedUnion("recordType", [
+  z.object({
+    recordType: z.literal("dashboard"),
+    name: shortText("Dashboard name"),
+    isDefault: z
+      .union([z.boolean(), z.enum(["true", "false"])])
+      .transform((value) => value === true || value === "true")
+      .default(false),
+    layoutJson: z.record(z.string(), z.unknown()).default({})
+  }),
+  z.object({
+    recordType: z.literal("widget"),
+    widgetType: shortText("Widget type"),
+    title: shortText("Widget title"),
+    dashboardId: z.string().uuid().optional(),
+    configJson: z.record(z.string(), z.unknown()).default({}),
+    positionIndex: z.coerce.number().int().min(0).default(0)
+  })
+]);
+
+const queryCreateSchema = z.object({
+  title: z.string().trim().optional(),
+  promptText: shortText("Prompt")
+});
+
+const reportCreateSchema = z.object({
+  reportType: shortText("Report type"),
+  periodStart: z.string().trim().optional(),
+  periodEnd: z.string().trim().optional()
+});
+
 export async function getAccountsPayload() {
   const context = await getTreasuryApiContext();
   const [accounts, bankRelationships, counterparties, currencyRates] = await Promise.all([
@@ -1126,6 +1157,249 @@ export async function createAdminRecord(payload: unknown) {
   return { ok: true, workflow, step };
 }
 
+export async function getDashboardsPayload() {
+  const context = await getTreasuryApiContext();
+  const [dashboards, queries] = await Promise.all([
+    selectMany(
+      context.supabase,
+      "dashboards",
+      "id, user_id, name, layout_json, is_default, updated_at",
+      context.organizationId,
+      {
+        filters: [{ column: "user_id", value: context.userId }],
+        orderBy: "updated_at",
+        ascending: false,
+        limit: 10
+      }
+    ),
+    selectMany(
+      context.supabase,
+      "query_threads",
+      "id, title, prompt_text, response_text, status, created_at, updated_at",
+      context.organizationId,
+      {
+        filters: [{ column: "user_id", value: context.userId }],
+        orderBy: "updated_at",
+        ascending: false,
+        limit: 10
+      }
+    )
+  ]);
+
+  const dashboardIds = dashboards.map((dashboard: JsonRecord) => String(dashboard.id));
+  const widgets = dashboardIds.length
+    ? await selectMany(
+        context.supabase,
+        "dashboard_widgets",
+        "id, dashboard_id, widget_type, title, config_json, position_index, updated_at",
+        undefined,
+        {
+          filters: [{ column: "dashboard_id", value: dashboardIds[0], operator: "in", multiValue: dashboardIds }],
+          orderBy: "position_index",
+          ascending: true,
+          limit: 30
+        }
+      )
+    : [];
+
+  return {
+    dashboards,
+    widgets,
+    queries
+  };
+}
+
+export async function createDashboardRecord(payload: unknown) {
+  const parsed = dashboardCreateSchema.parse(payload);
+  const context = await getTreasuryApiContext();
+
+  if (parsed.recordType === "dashboard") {
+    if (parsed.isDefault) {
+      await (context.supabase as any)
+        .from("dashboards")
+        .update({ is_default: false })
+        .eq("organization_id", context.organizationId)
+        .eq("user_id", context.userId);
+    }
+
+    const record = await insertOne(context.supabase, "dashboards", {
+      organization_id: context.organizationId,
+      user_id: context.userId,
+      name: parsed.name,
+      is_default: parsed.isDefault,
+      layout_json: parsed.layoutJson
+    });
+
+    await createAuditLog(context, "dashboard.created", "dashboard", String(record.id));
+    return { ok: true, record };
+  }
+
+  const targetDashboard =
+    parsed.dashboardId ??
+    String(
+      (
+        await selectOne(
+          context.supabase,
+          "dashboards",
+          "id",
+          context.organizationId,
+          [{ column: "user_id", value: context.userId }],
+          { orderBy: "is_default", ascending: false }
+        )
+      )?.id ?? ""
+    );
+
+  if (!targetDashboard) {
+    throw new ApiError(400, "Create a dashboard before adding widgets.");
+  }
+
+  const record = await insertOne(context.supabase, "dashboard_widgets", {
+    dashboard_id: targetDashboard,
+    widget_type: parsed.widgetType,
+    title: parsed.title,
+    config_json: parsed.configJson,
+    position_index: parsed.positionIndex
+  });
+
+  await createAuditLog(context, "dashboard.widget_created", "dashboard_widget", String(record.id));
+  return { ok: true, record };
+}
+
+export async function getQueryPayload() {
+  const context = await getTreasuryApiContext();
+  const queries = await selectMany(
+    context.supabase,
+    "query_threads",
+    "id, title, prompt_text, response_text, status, created_at, updated_at",
+    context.organizationId,
+    {
+      filters: [{ column: "user_id", value: context.userId }],
+      orderBy: "updated_at",
+      ascending: false,
+      limit: 20
+    }
+  );
+
+  return { queries };
+}
+
+export async function createQueryRecord(payload: unknown) {
+  const parsed = queryCreateSchema.parse(payload);
+  const context = await getTreasuryApiContext();
+  const [payments, notifications, reports, integrations] = await Promise.all([
+    selectMany(context.supabase, "payments", "id, amount, currency_code, status", context.organizationId, {
+      orderBy: "created_at",
+      ascending: false,
+      limit: 50
+    }),
+    selectMany(
+      context.supabase,
+      "notifications",
+      "id, severity, title, created_at",
+      context.organizationId,
+      { orderBy: "created_at", ascending: false, limit: 20 }
+    ),
+    selectMany(
+      context.supabase,
+      "compliance_reports",
+      "id, report_type, status, created_at",
+      context.organizationId,
+      { orderBy: "created_at", ascending: false, limit: 20 }
+    ),
+    selectMany(
+      context.supabase,
+      "integration_connections",
+      "id, provider_name, integration_type, status, last_success_at",
+      context.organizationId,
+      { orderBy: "updated_at", ascending: false, limit: 20 }
+    )
+  ]);
+
+  const responseText = buildQueryResponse(parsed.promptText, {
+    payments,
+    notifications,
+    reports,
+    integrations
+  });
+
+  const record = await insertOne(context.supabase, "query_threads", {
+    organization_id: context.organizationId,
+    user_id: context.userId,
+    title: parsed.title || parsed.promptText.slice(0, 64),
+    prompt_text: parsed.promptText,
+    response_text: responseText,
+    status: "completed"
+  });
+
+  await createAuditLog(context, "query.completed", "query_thread", String(record.id));
+  return { ok: true, record };
+}
+
+export async function getReportsPayload() {
+  const context = await getTreasuryApiContext();
+  const [reports, auditLogs, notifications] = await Promise.all([
+    selectMany(
+      context.supabase,
+      "compliance_reports",
+      "id, report_type, period_start, period_end, status, storage_key, created_at, updated_at",
+      context.organizationId,
+      { orderBy: "created_at", ascending: false, limit: 20 }
+    ),
+    selectMany(
+      context.supabase,
+      "audit_logs",
+      "id, action, entity_type, severity, occurred_at, metadata_json",
+      context.organizationId,
+      { orderBy: "occurred_at", ascending: false, limit: 20 }
+    ),
+    selectMany(
+      context.supabase,
+      "notifications",
+      "id, title, severity, body, created_at",
+      context.organizationId,
+      { orderBy: "created_at", ascending: false, limit: 10 }
+    )
+  ]);
+
+  return {
+    reports,
+    auditLogs,
+    notifications
+  };
+}
+
+export async function createReportRecord(payload: unknown) {
+  const parsed = reportCreateSchema.parse(payload);
+  const context = await getTreasuryApiContext();
+
+  const record = await insertOne(context.supabase, "compliance_reports", {
+    organization_id: context.organizationId,
+    report_type: parsed.reportType,
+    period_start: parsed.periodStart || null,
+    period_end: parsed.periodEnd || null,
+    status: "generated",
+    storage_key: [
+      "reports",
+      context.organizationId,
+      parsed.reportType,
+      new Date().toISOString().slice(0, 10)
+    ].join("/"),
+    created_by_user_id: context.userId
+  });
+
+  await insertOne(context.supabase, "notifications", {
+    organization_id: context.organizationId,
+    title: `${parsed.reportType} report generated`,
+    body: "A new treasury report is ready for review and distribution.",
+    severity: "info",
+    channel: "in_app",
+    status: "pending"
+  });
+
+  await createAuditLog(context, "reports.generated", "compliance_report", String(record.id));
+  return { ok: true, record };
+}
+
 async function getTreasuryApiContext(): Promise<TreasuryApiContext> {
   const [session, supabase] = await Promise.all([getAppSession(), createSupabaseServerClient()]);
 
@@ -1207,6 +1481,53 @@ async function getLatestForecastLines(context: TreasuryApiContext) {
     String(latestForecast.id),
     { orderBy: "forecast_date", ascending: true }
   );
+}
+
+function buildQueryResponse(
+  promptText: string,
+  context: {
+    payments: JsonRecord[];
+    notifications: JsonRecord[];
+    reports: JsonRecord[];
+    integrations: JsonRecord[];
+  }
+) {
+  const prompt = promptText.toLowerCase();
+  const paymentVolume = context.payments.reduce((sum, payment) => sum + Number(payment.amount ?? 0), 0);
+  const pendingPayments = context.payments.filter((payment) =>
+    ["draft", "submitted", "approved"].includes(String(payment.status))
+  ).length;
+  const criticalAlerts = context.notifications.filter(
+    (notification) => String(notification.severity) === "critical"
+  ).length;
+  const generatedReports = context.reports.filter(
+    (report) => String(report.status) === "generated" || String(report.status) === "delivered"
+  ).length;
+  const unhealthyIntegrations = context.integrations.filter(
+    (integration) => !["active", "healthy"].includes(String(integration.status))
+  ).length;
+
+  if (prompt.includes("payment")) {
+    return `There are ${pendingPayments} payment items still moving through the workflow, representing approximately ${paymentVolume.toFixed(2)} in notional volume. Prioritize approval or release actions before the next execution window.`;
+  }
+
+  if (prompt.includes("integration") || prompt.includes("connector")) {
+    return unhealthyIntegrations
+      ? `${unhealthyIntegrations} integration connections currently need attention. Review the integrations workspace and trigger sync retries for stale connectors.`
+      : "All tracked integration connections are currently healthy. No stalled sync runs are visible in the latest operating window.";
+  }
+
+  if (prompt.includes("report") || prompt.includes("compliance") || prompt.includes("audit")) {
+    return `The workspace currently holds ${generatedReports} generated compliance outputs. ${criticalAlerts} critical alerts are present in the audit and notification trail and should be included in the next reporting pack.`;
+  }
+
+  if (prompt.includes("risk") || prompt.includes("alert")) {
+    return criticalAlerts
+      ? `There are ${criticalAlerts} critical treasury alerts active right now. Review the alert rail and recent audit events before approving sensitive actions.`
+      : "No critical treasury alerts are currently active. Risk monitoring is running without severe exceptions in the latest dataset.";
+  }
+
+  return `Treasury operating summary: ${pendingPayments} open payment items, ${criticalAlerts} critical alerts, ${generatedReports} generated reports, and ${unhealthyIntegrations} connectors requiring intervention. Refine the question for a more specific operational answer.`;
 }
 
 async function selectPaymentApprovals(context: TreasuryApiContext) {

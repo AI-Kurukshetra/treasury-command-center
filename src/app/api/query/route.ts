@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 
 import { handleApiRouteError } from "@/lib/api/errors";
-import { createReportRecord, getReportsPayload } from "@/lib/domain/treasury-api";
+import { createQueryRecord, getQueryPayload } from "@/lib/domain/treasury-api";
 
 export async function GET() {
   try {
-    const payload = await getReportsPayload();
+    const payload = await getQueryPayload();
     return NextResponse.json(payload);
   } catch (error) {
     return handleApiRouteError(error);
@@ -15,7 +15,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as unknown;
-    const payload = await createReportRecord(body);
+    const payload = await createQueryRecord(body);
     return NextResponse.json(payload);
   } catch (error) {
     return handleApiRouteError(error);

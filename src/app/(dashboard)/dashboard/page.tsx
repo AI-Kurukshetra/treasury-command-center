@@ -1,6 +1,8 @@
 import {
   AlertTriangle,
   ArrowRightLeft,
+  Bot,
+  LayoutDashboard,
   Landmark,
   Radar,
   ReceiptText,
@@ -10,16 +12,48 @@ import {
 import { CashTrendChart } from "@/components/charts/cash-trend-chart";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { PageHeader } from "@/components/layout/page-header";
+import { ActionCard } from "@/components/operations/action-card";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { SectionEmpty } from "@/components/ui/section-empty";
+import { getDashboardsPayload } from "@/lib/domain/treasury-api";
 import { getDashboardSnapshot } from "@/lib/domain/treasury";
 import { formatCurrency } from "@/lib/utils";
 
 const icons = [Landmark, ArrowRightLeft, ShieldCheck, AlertTriangle];
 
+type DashboardRecord = {
+  id: string;
+  name: string;
+  is_default: boolean;
+  updated_at: string;
+};
+
+type WidgetRecord = {
+  id: string;
+  dashboard_id: string;
+  widget_type: string;
+  title: string;
+  position_index: number;
+};
+
+type QueryRecord = {
+  id: string;
+  title: string;
+  prompt_text: string;
+  response_text: string | null;
+  status: string;
+  updated_at: string;
+};
+
 export default async function DashboardPage() {
-  const snapshot = await getDashboardSnapshot();
+  const [snapshot, dashboardWorkspace] = await Promise.all([
+    getDashboardSnapshot(),
+    getDashboardsPayload()
+  ]);
+  const dashboards = dashboardWorkspace.dashboards as DashboardRecord[];
+  const widgets = dashboardWorkspace.widgets as WidgetRecord[];
+  const queries = dashboardWorkspace.queries as QueryRecord[];
 
   return (
     <>
@@ -229,6 +263,145 @@ export default async function DashboardPage() {
             )}
           </CardContent>
         </Card>
+      </section>
+
+      <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-[1rem] bg-primary/10 text-primary">
+                <LayoutDashboard className="h-5 w-5" />
+              </div>
+              <div>
+                <CardTitle>Dashboard personalization</CardTitle>
+                <CardDescription>
+                  Named executive views, default workspace selection, and widget-level composition.
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {dashboards.length ? (
+              dashboards.map((dashboard) => {
+                const widgetCount = widgets.filter((widget) => widget.dashboard_id === dashboard.id).length;
+
+                return (
+                  <div
+                    key={dashboard.id}
+                    className="rounded-[1.5rem] border border-border/70 bg-white/68 p-5"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="font-display text-xl font-semibold">{dashboard.name}</p>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {widgetCount} widgets · updated {dashboard.updated_at.slice(0, 10)}
+                        </p>
+                      </div>
+                      <Badge variant={dashboard.is_default ? "success" : "secondary"}>
+                        {dashboard.is_default ? "default" : "named view"}
+                      </Badge>
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <SectionEmpty
+                title="No dashboards configured yet"
+                description="Create a default operator dashboard before adding widgets or personalized layouts."
+              />
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="dark-panel border-slate-800 text-white">
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-[1rem] bg-white/10 text-secondary">
+                <Bot className="h-5 w-5" />
+              </div>
+              <div>
+                <CardTitle className="text-white">Treasury query surface</CardTitle>
+                <CardDescription className="text-white/70">
+                  Natural-language prompts resolved into an operator-ready response history.
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {queries.length ? (
+              queries.slice(0, 3).map((query) => (
+                <div key={query.id} className="rounded-[1.4rem] border border-white/10 bg-white/8 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="font-display text-lg font-semibold text-white">{query.title}</p>
+                    <Badge
+                      variant="outline"
+                      className="border-white/15 bg-white/10 text-white/80"
+                    >
+                      {query.status}
+                    </Badge>
+                  </div>
+                  <p className="mt-3 text-sm leading-6 text-white/70">{query.prompt_text}</p>
+                  <p className="mt-4 text-sm leading-6 text-white/85">{query.response_text}</p>
+                </div>
+              ))
+            ) : (
+              <SectionEmpty
+                title="No query history yet"
+                description="Ask a treasury question to populate reusable query context for the operator team."
+              />
+            )}
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="grid gap-6 xl:grid-cols-3">
+        <ActionCard
+          title="Create dashboard"
+          description="Stand up a named workspace and optionally make it the default command view."
+          endpoint="/api/dashboards"
+          submitLabel="Create dashboard"
+          payloadDefaults={{ recordType: "dashboard", isDefault: "true" }}
+          fields={[
+            { name: "name", label: "Dashboard name", placeholder: "Morning liquidity watch" }
+          ]}
+        />
+        <ActionCard
+          title="Add widget"
+          description="Add a high-signal widget to the default dashboard or a specified dashboard id."
+          endpoint="/api/dashboards"
+          submitLabel="Add widget"
+          payloadDefaults={{ recordType: "widget" }}
+          fields={[
+            { name: "title", label: "Widget title", placeholder: "Top liquidity entities" },
+            {
+              name: "widgetType",
+              label: "Widget type",
+              type: "select",
+              options: [
+                { label: "KPI", value: "kpi" },
+                { label: "Chart", value: "chart" },
+                { label: "Queue", value: "queue" },
+                { label: "Feed", value: "feed" }
+              ]
+            },
+            { name: "dashboardId", label: "Dashboard id (optional)", placeholder: dashboards[0]?.id ?? "Uses default dashboard" }
+          ]}
+        />
+        <ActionCard
+          title="Ask treasury query"
+          description="Capture a natural-language question and save the generated operating answer."
+          endpoint="/api/query"
+          submitLabel="Run query"
+          fields={[
+            { name: "title", label: "Saved title", placeholder: "Daily payments posture" },
+            {
+              name: "promptText",
+              label: "Prompt",
+              type: "textarea",
+              placeholder: "What requires attention across payments, reports, and integrations today?"
+            }
+          ]}
+        />
       </section>
 
       <section className="grid gap-6 xl:grid-cols-3">

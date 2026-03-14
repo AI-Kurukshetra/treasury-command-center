@@ -12,7 +12,13 @@ const serviceMocks = vi.hoisted(() => ({
   getPaymentsPayload: vi.fn(),
   createPaymentsRecord: vi.fn(),
   getAdminPayload: vi.fn(),
-  createAdminRecord: vi.fn()
+  createAdminRecord: vi.fn(),
+  getDashboardsPayload: vi.fn(),
+  createDashboardRecord: vi.fn(),
+  getQueryPayload: vi.fn(),
+  createQueryRecord: vi.fn(),
+  getReportsPayload: vi.fn(),
+  createReportRecord: vi.fn()
 }));
 
 vi.mock("@/lib/domain/treasury-api", () => serviceMocks);
@@ -20,8 +26,11 @@ vi.mock("@/lib/domain/treasury-api", () => serviceMocks);
 import { GET as getAccounts, POST as postAccounts } from "@/app/api/accounts/route";
 import { GET as getAdmin, POST as postAdmin } from "@/app/api/admin/route";
 import { GET as getCashPositions, POST as postCashPositions } from "@/app/api/cash-positions/route";
+import { GET as getDashboards, POST as postDashboards } from "@/app/api/dashboards/route";
 import { GET as getFx, POST as postFx } from "@/app/api/fx/route";
 import { GET as getPayments, POST as postPayments } from "@/app/api/payments/route";
+import { GET as getQuery, POST as postQuery } from "@/app/api/query/route";
+import { GET as getReports, POST as postReports } from "@/app/api/reports/route";
 
 describe("treasury domain API routes", () => {
   beforeEach(() => {
@@ -114,6 +123,49 @@ describe("treasury domain API routes", () => {
     await expect(paymentsPost.json()).resolves.toEqual({ ok: true, payment: { id: "pay-2" } });
     await expect(adminGet.json()).resolves.toEqual({ roles: [{ id: "role-1" }] });
     await expect(adminPost.json()).resolves.toEqual({ ok: true, record: { id: "setting-1" } });
+  });
+
+  it("returns dashboard, query, and report payloads", async () => {
+    serviceMocks.getDashboardsPayload.mockResolvedValue({ dashboards: [{ id: "dash-1" }] });
+    serviceMocks.createDashboardRecord.mockResolvedValue({ ok: true, record: { id: "widget-1" } });
+    serviceMocks.getQueryPayload.mockResolvedValue({ queries: [{ id: "query-1" }] });
+    serviceMocks.createQueryRecord.mockResolvedValue({ ok: true, record: { id: "query-2" } });
+    serviceMocks.getReportsPayload.mockResolvedValue({ reports: [{ id: "report-1" }] });
+    serviceMocks.createReportRecord.mockResolvedValue({ ok: true, record: { id: "report-2" } });
+
+    const [dashboardsGet, dashboardsPost, queryGet, queryPost, reportsGet, reportsPost] = await Promise.all([
+      getDashboards(),
+      postDashboards(
+        new Request("http://localhost/api/dashboards", {
+          method: "POST",
+          body: JSON.stringify({ recordType: "widget", title: "Liquidity", widgetType: "kpi" }),
+          headers: { "content-type": "application/json" }
+        })
+      ),
+      getQuery(),
+      postQuery(
+        new Request("http://localhost/api/query", {
+          method: "POST",
+          body: JSON.stringify({ promptText: "What needs attention?" }),
+          headers: { "content-type": "application/json" }
+        })
+      ),
+      getReports(),
+      postReports(
+        new Request("http://localhost/api/reports", {
+          method: "POST",
+          body: JSON.stringify({ reportType: "audit" }),
+          headers: { "content-type": "application/json" }
+        })
+      )
+    ]);
+
+    await expect(dashboardsGet.json()).resolves.toEqual({ dashboards: [{ id: "dash-1" }] });
+    await expect(dashboardsPost.json()).resolves.toEqual({ ok: true, record: { id: "widget-1" } });
+    await expect(queryGet.json()).resolves.toEqual({ queries: [{ id: "query-1" }] });
+    await expect(queryPost.json()).resolves.toEqual({ ok: true, record: { id: "query-2" } });
+    await expect(reportsGet.json()).resolves.toEqual({ reports: [{ id: "report-1" }] });
+    await expect(reportsPost.json()).resolves.toEqual({ ok: true, record: { id: "report-2" } });
   });
 
   it("maps service authorization failures to HTTP 401", async () => {
