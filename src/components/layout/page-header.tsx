@@ -14,14 +14,16 @@ export function PageHeader({
   meta = []
 }: PageHeaderProps) {
   return (
-    <div className="space-y-5 rounded-[2rem] border border-white/70 bg-white/70 p-7 shadow-[0_28px_70px_rgba(17,30,64,0.08)]">
+    <div className="space-y-5 rounded-[2rem] border border-white/70 bg-white/70 p-5 shadow-[0_28px_70px_rgba(17,30,64,0.08)] md:p-7">
       {eyebrow ? (
         <Badge variant="secondary" className="w-fit">
           {eyebrow}
         </Badge>
       ) : null}
       <div className="space-y-3">
-        <h1 className="max-w-4xl text-4xl font-semibold tracking-tight md:text-5xl">{title}</h1>
+        <h1 className="max-w-4xl break-words text-3xl font-semibold tracking-tight sm:text-4xl md:text-5xl">
+          {title}
+        </h1>
         <p className="max-w-3xl text-base leading-7 text-muted-foreground">
           {description}
         </p>

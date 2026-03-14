@@ -21,16 +21,16 @@ export default function RootLayout({
           <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] bg-[radial-gradient(circle_at_top_left,rgba(27,76,161,0.16),transparent_30%),radial-gradient(circle_at_72%_0%,rgba(217,136,27,0.18),transparent_22%)]" />
           <div className="pointer-events-none absolute inset-x-0 top-[5.5rem] -z-10 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
           <header className="sticky top-0 z-40 border-b border-border/70 bg-background/80 backdrop-blur-xl">
-            <div className="container flex h-20 items-center justify-between gap-6">
-              <Link href="/" className="flex items-center gap-4">
-                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-sm font-bold text-primary-foreground shadow-[0_18px_40px_rgba(14,28,67,0.22)]">
+            <div className="container flex min-h-20 items-center justify-between gap-3 px-4 py-3 md:gap-6 md:px-6">
+              <Link href="/" className="flex min-w-0 items-center gap-3 md:gap-4">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary text-sm font-bold text-primary-foreground shadow-[0_18px_40px_rgba(14,28,67,0.22)] md:h-12 md:w-12">
                   TC
                 </span>
-                <div>
-                  <p className="font-display text-base font-semibold leading-none">
+                <div className="min-w-0">
+                  <p className="truncate font-display text-sm font-semibold leading-none sm:text-base">
                     Treasury Command Center
                   </p>
-                  <p className="mt-1 text-xs uppercase tracking-[0.24em] text-muted-foreground">
+                  <p className="mt-1 truncate text-[0.65rem] uppercase tracking-[0.18em] text-muted-foreground sm:text-xs sm:tracking-[0.24em]">
                     Liquidity, risk, and approvals
                   </p>
                 </div>
