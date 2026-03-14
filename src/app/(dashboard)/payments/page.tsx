@@ -1,3 +1,4 @@
+import { ActionCard } from "@/components/operations/action-card";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -90,6 +91,75 @@ export default async function PaymentsPage() {
             )}
           </CardContent>
         </Card>
+      </section>
+
+      <section className="grid gap-6 xl:grid-cols-2">
+        <ActionCard
+          title="Initiate payment"
+          description="Create a payment draft directly in the treasury workspace and route it into the approval engine."
+          endpoint="/api/payments"
+          submitLabel="Create payment"
+          fields={[
+            { name: "beneficiaryName", label: "Beneficiary", placeholder: "Acme Logistics" },
+            { name: "amount", label: "Amount", type: "number", placeholder: "125000" },
+            {
+              name: "currencyCode",
+              label: "Currency",
+              type: "select",
+              options: [
+                { label: "USD", value: "USD" },
+                { label: "EUR", value: "EUR" },
+                { label: "GBP", value: "GBP" }
+              ]
+            },
+            {
+              name: "requestedExecutionDate",
+              label: "Requested execution date",
+              type: "date"
+            },
+            { name: "purpose", label: "Purpose", type: "textarea", placeholder: "Supplier settlement" }
+          ]}
+        />
+        <ActionCard
+          title="Record approval decision"
+          description="Approve or reject a payment and optionally register a signature event for audit coverage."
+          endpoint="/api/approvals"
+          submitLabel="Record decision"
+          fields={[
+            { name: "paymentId", label: "Payment ID", placeholder: "Paste payment UUID" },
+            {
+              name: "decision",
+              label: "Decision",
+              type: "select",
+              options: [
+                { label: "Approved", value: "approved" },
+                { label: "Rejected", value: "rejected" },
+                { label: "Escalated", value: "escalated" }
+              ]
+            },
+            { name: "reason", label: "Reason", type: "textarea", placeholder: "Optional rationale" },
+            {
+              name: "stepUpVerified",
+              label: "Step-up verified",
+              type: "select",
+              options: [
+                { label: "True", value: "true" },
+                { label: "False", value: "false" }
+              ],
+              defaultValue: "false"
+            },
+            {
+              name: "createSignature",
+              label: "Create signature",
+              type: "select",
+              options: [
+                { label: "True", value: "true" },
+                { label: "False", value: "false" }
+              ],
+              defaultValue: "false"
+            }
+          ]}
+        />
       </section>
     </>
   );

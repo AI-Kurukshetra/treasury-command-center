@@ -1,3 +1,4 @@
+import { ActionCard } from "@/components/operations/action-card";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -71,6 +72,36 @@ export default async function IntegrationsPage() {
             )}
           </CardContent>
         </Card>
+      </section>
+
+      <section className="grid gap-6 xl:grid-cols-2">
+        <ActionCard
+          title="Register connector"
+          description="Create a bank, ERP, market-data, OCR, or signature connector record in the integrations hub."
+          endpoint="/api/integrations"
+          submitLabel="Create connector"
+          payloadDefaults={{ recordType: "connection" }}
+          fields={[
+            {
+              name: "integrationType",
+              label: "Integration type",
+              type: "select",
+              options: [
+                { label: "Bank", value: "bank" },
+                { label: "ERP", value: "erp" },
+                { label: "Market data", value: "market_data" },
+                { label: "OCR", value: "ocr" },
+                { label: "Signature", value: "signature" }
+              ]
+            },
+            { name: "providerName", label: "Provider name", placeholder: "SAP S/4HANA" },
+            {
+              name: "credentialsReference",
+              label: "Credentials reference",
+              placeholder: "vault://sap-prod"
+            }
+          ]}
+        />
       </section>
     </>
   );

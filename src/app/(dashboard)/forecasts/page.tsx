@@ -1,5 +1,6 @@
 import { CashTrendChart } from "@/components/charts/cash-trend-chart";
 import { PageHeader } from "@/components/layout/page-header";
+import { ActionCard } from "@/components/operations/action-card";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { SectionEmpty } from "@/components/ui/section-empty";
 import { getDashboardSnapshot } from "@/lib/domain/treasury";
@@ -62,6 +63,48 @@ export default async function ForecastsPage() {
             </div>
           </CardContent>
         </Card>
+      </section>
+
+      <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+        <ActionCard
+          title="Generate forecast"
+          description="Publish a new short-term or long-term forecast based on current transactions and scheduled payments."
+          endpoint="/api/forecasts"
+          submitLabel="Generate forecast"
+          fields={[
+            { name: "name", label: "Forecast name", placeholder: "Weekly liquidity outlook" },
+            {
+              name: "horizonType",
+              label: "Horizon",
+              type: "select",
+              options: [
+                { label: "Short term", value: "short_term" },
+                { label: "Long term", value: "long_term" }
+              ]
+            },
+            {
+              name: "methodology",
+              label: "Methodology",
+              type: "select",
+              options: [
+                { label: "Historical", value: "historical" },
+                { label: "Rules", value: "rules" },
+                { label: "Scenario", value: "scenario" }
+              ]
+            },
+            {
+              name: "reportingCurrencyCode",
+              label: "Reporting currency",
+              type: "select",
+              options: [
+                { label: "USD", value: "USD" },
+                { label: "EUR", value: "EUR" }
+              ]
+            },
+            { name: "weeks", label: "Weeks", type: "number", defaultValue: "6" },
+            { name: "scenarioName", label: "Scenario name", placeholder: "Base release case" }
+          ]}
+        />
       </section>
     </>
   );

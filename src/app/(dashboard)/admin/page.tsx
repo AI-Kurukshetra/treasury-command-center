@@ -1,3 +1,4 @@
+import { ActionCard } from "@/components/operations/action-card";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -36,6 +37,54 @@ export default function AdminPage() {
             </CardContent>
           </Card>
         ))}
+      </div>
+
+      <div className="mt-6 grid gap-6 xl:grid-cols-3">
+        <ActionCard
+          title="Create role"
+          description="Add a treasury role to the tenant RBAC model."
+          endpoint="/api/admin"
+          submitLabel="Create role"
+          payloadDefaults={{ recordType: "role" }}
+          fields={[
+            { name: "name", label: "Role name", placeholder: "Regional Treasurer" },
+            { name: "description", label: "Description", type: "textarea", placeholder: "Approves EMEA payments" }
+          ]}
+        />
+        <ActionCard
+          title="Publish policy draft"
+          description="Register a new treasury policy artifact for workflow or control coverage."
+          endpoint="/api/admin"
+          submitLabel="Create policy"
+          payloadDefaults={{ recordType: "policy" }}
+          fields={[
+            { name: "name", label: "Policy name", placeholder: "Liquidity buffer policy" },
+            {
+              name: "policyType",
+              label: "Policy type",
+              type: "select",
+              options: [
+                { label: "Approval", value: "approval" },
+                { label: "Liquidity", value: "liquidity" },
+                { label: "Risk", value: "risk" },
+                { label: "Security", value: "security" }
+              ]
+            }
+          ]}
+        />
+        <ActionCard
+          title="Create approval workflow"
+          description="Stand up a simple approval workflow and first routing step."
+          endpoint="/api/admin"
+          submitLabel="Create workflow"
+          payloadDefaults={{ recordType: "workflow" }}
+          fields={[
+            { name: "name", label: "Workflow name", placeholder: "Payments over threshold" },
+            { name: "workflowType", label: "Workflow type", placeholder: "payment" },
+            { name: "approverReference", label: "Approver reference", placeholder: "Treasury Admin" },
+            { name: "thresholdAmount", label: "Threshold amount", type: "number", defaultValue: "0" }
+          ]}
+        />
       </div>
     </>
   );
