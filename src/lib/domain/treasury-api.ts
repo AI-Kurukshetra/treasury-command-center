@@ -657,26 +657,45 @@ export async function getPaymentsPayload() {
 export async function createPaymentsRecord(payload: unknown) {
   const parsed = paymentCreateSchema.parse(payload);
   const context = await getTreasuryApiContext();
+  const workflowId =
+    parsed.approvalWorkflowId ?? (await resolveApprovalWorkflowId(context, parsed.amount));
   const payment = await insertOne(context.supabase, "payments", {
     organization_id: context.organizationId,
     subsidiary_id:
       parsed.subsidiaryId ?? (await getFirstId(context.supabase, "subsidiaries", context.organizationId)),
     source_bank_account_id:
       parsed.sourceBankAccountId ?? (await getFirstId(context.supabase, "bank_accounts", context.organizationId)),
-    approval_workflow_id:
-      parsed.approvalWorkflowId ?? (await getFirstId(context.supabase, "approval_workflows", context.organizationId)),
+    approval_workflow_id: workflowId,
     beneficiary_name: parsed.beneficiaryName,
     payment_type: parsed.paymentType,
     amount: parsed.amount,
     currency_code: parsed.currencyCode,
     requested_execution_date: parsed.requestedExecutionDate,
     purpose: parsed.purpose,
-    status: "draft",
+    status: workflowId ? "submitted" : "draft",
     created_by: context.userId
   });
+
+  if (workflowId) {
+    const requiredSteps = await getRequiredWorkflowSteps(context, workflowId, parsed.amount);
+    if (requiredSteps.length) {
+      await insertMany(
+        context.supabase,
+        "payment_approvals",
+        requiredSteps.map((step: JsonRecord) => ({
+          payment_id: payment.id,
+          workflow_step_id: step.id,
+          decision: "pending",
+          step_up_verified: false
+        }))
+      );
+    }
+  }
+
   await createAuditLog(context, "payments.created", "payment", String(payment.id), "info", {
     amount: parsed.amount,
-    currencyCode: parsed.currencyCode
+    currencyCode: parsed.currencyCode,
+    approvalWorkflowId: workflowId
   });
   return { ok: true, payment };
 }
@@ -704,7 +723,7 @@ export async function createApprovalDecision(payload: unknown) {
   const payment = await selectOne(
     context.supabase,
     "payments",
-    "id, organization_id, created_by, status",
+    "id, organization_id, created_by, status, amount, approval_workflow_id",
     context.organizationId,
     [{ column: "id", value: parsed.paymentId }]
   );
@@ -713,8 +732,36 @@ export async function createApprovalDecision(payload: unknown) {
     throw new ApiError(404, "Payment not found.");
   }
 
+  if (
+    parsed.decision === "approved" &&
+    Number(payment.amount ?? 0) >= 100000 &&
+    !parsed.stepUpVerified
+  ) {
+    throw new ApiError(400, "Step-up verification is required for high-value approvals.");
+  }
+
+  const existingApprovals = await selectByColumn(
+    context.supabase,
+    "payment_approvals",
+    "id, workflow_step_id, decision, step_up_verified, created_at",
+    "payment_id",
+    parsed.paymentId,
+    { orderBy: "created_at", ascending: true }
+  );
+  const requiredSteps = payment.approval_workflow_id
+    ? await getRequiredWorkflowSteps(
+        context,
+        String(payment.approval_workflow_id),
+        Number(payment.amount ?? 0)
+      )
+    : [];
+  const nextPendingApproval = existingApprovals.find(
+    (row: JsonRecord) => String(row.decision) === "pending"
+  );
+
   const approval = await insertOne(context.supabase, "payment_approvals", {
     payment_id: parsed.paymentId,
+    workflow_step_id: nextPendingApproval?.workflow_step_id ?? requiredSteps[0]?.id ?? null,
     approver_user_id: context.userId,
     decision: parsed.decision,
     decision_reason: parsed.reason,
@@ -736,7 +783,11 @@ export async function createApprovalDecision(payload: unknown) {
 
   const nextStatus =
     parsed.decision === "approved"
-      ? "approved"
+      ? calculateApprovalStatus({
+          requiredSteps,
+          existingApprovals,
+          latestDecision: parsed.decision
+        })
       : parsed.decision === "rejected"
         ? "rejected"
         : "submitted";
@@ -757,7 +808,13 @@ export async function createApprovalDecision(payload: unknown) {
   });
 
   await createAuditLog(context, `payments.${parsed.decision}`, "payment", parsed.paymentId, "info", {
-    stepUpVerified: parsed.stepUpVerified
+    stepUpVerified: parsed.stepUpVerified,
+    remainingApprovals: Math.max(
+      requiredSteps.length -
+        countApprovedSteps(existingApprovals) -
+        (parsed.decision === "approved" ? 1 : 0),
+      0
+    )
   });
   return { ok: true, approval, signature, payment: updatedPayment };
 }
@@ -1139,7 +1196,9 @@ export async function createAdminRecord(payload: unknown) {
     name: parsed.name,
     workflow_type: parsed.workflowType,
     rules_json: {
-      thresholdAmount: parsed.thresholdAmount
+      thresholdAmount: parsed.thresholdAmount,
+      minimumApprovals: parsed.thresholdAmount >= 500000 ? 2 : 1,
+      requireStepUp: parsed.thresholdAmount >= 100000
     },
     status: "active"
   });
@@ -1152,9 +1211,21 @@ export async function createAdminRecord(payload: unknown) {
       minimumAmount: parsed.thresholdAmount
     }
   });
+  const workflowRule = await insertOne(context.supabase, "workflow_rules", {
+    organization_id: context.organizationId,
+    approval_workflow_id: workflow.id,
+    name: `${parsed.name} routing rule`,
+    trigger_type: parsed.workflowType,
+    rule_json: {
+      thresholdAmount: parsed.thresholdAmount,
+      minimumApprovals: parsed.thresholdAmount >= 500000 ? 2 : 1,
+      requireStepUp: parsed.thresholdAmount >= 100000
+    },
+    status: "active"
+  });
 
   await createAuditLog(context, "admin.workflow_created", "approval_workflow", String(workflow.id));
-  return { ok: true, workflow, step };
+  return { ok: true, workflow, step, workflowRule };
 }
 
 export async function getDashboardsPayload() {
@@ -1528,6 +1599,71 @@ function buildQueryResponse(
   }
 
   return `Treasury operating summary: ${pendingPayments} open payment items, ${criticalAlerts} critical alerts, ${generatedReports} generated reports, and ${unhealthyIntegrations} connectors requiring intervention. Refine the question for a more specific operational answer.`;
+}
+
+async function resolveApprovalWorkflowId(context: TreasuryApiContext, amount: number) {
+  const workflows = await selectMany(
+    context.supabase,
+    "approval_workflows",
+    "id, name, rules_json, status, updated_at",
+    context.organizationId,
+    { orderBy: "updated_at", ascending: false, limit: 20 }
+  );
+
+  const activeWorkflows = workflows.filter((workflow: JsonRecord) => workflow.status === "active");
+  if (!activeWorkflows.length) {
+    return null;
+  }
+
+  const ranked = [...activeWorkflows].sort((left: JsonRecord, right: JsonRecord) => {
+    const leftThreshold = Number((left.rules_json as JsonRecord | undefined)?.thresholdAmount ?? 0);
+    const rightThreshold = Number((right.rules_json as JsonRecord | undefined)?.thresholdAmount ?? 0);
+    return rightThreshold - leftThreshold;
+  });
+
+  const matched = ranked.find((workflow: JsonRecord) => {
+    const threshold = Number((workflow.rules_json as JsonRecord | undefined)?.thresholdAmount ?? 0);
+    return amount >= threshold;
+  });
+
+  return String((matched ?? ranked[ranked.length - 1])?.id ?? "");
+}
+
+async function getRequiredWorkflowSteps(
+  context: TreasuryApiContext,
+  workflowId: string,
+  amount: number
+) {
+  const steps = await selectByColumn(
+    context.supabase,
+    "approval_workflow_steps",
+    "id, approval_workflow_id, step_order, approver_reference, threshold_json",
+    "approval_workflow_id",
+    workflowId,
+    { orderBy: "step_order", ascending: true }
+  );
+
+  return steps.filter((step: JsonRecord) => {
+    const minimumAmount = Number((step.threshold_json as JsonRecord | undefined)?.minimumAmount ?? 0);
+    return amount >= minimumAmount;
+  });
+}
+
+export function countApprovedSteps(approvals: JsonRecord[]) {
+  return approvals.filter((approval) => String(approval.decision) === "approved").length;
+}
+
+export function calculateApprovalStatus({
+  requiredSteps,
+  existingApprovals,
+  latestDecision
+}: {
+  requiredSteps: JsonRecord[];
+  existingApprovals: JsonRecord[];
+  latestDecision: string;
+}) {
+  const approvedCount = countApprovedSteps(existingApprovals) + (latestDecision === "approved" ? 1 : 0);
+  return approvedCount >= Math.max(requiredSteps.length, 1) ? "approved" : "submitted";
 }
 
 async function selectPaymentApprovals(context: TreasuryApiContext) {
