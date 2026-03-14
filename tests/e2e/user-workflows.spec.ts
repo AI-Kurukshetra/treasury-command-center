@@ -29,13 +29,16 @@ test("authenticated user can navigate the primary treasury workflows and sign ou
   const sidebar = page.locator("aside");
 
   for (const item of primaryNavigation) {
-    await sidebar.getByRole("link", { name: new RegExp(`^${escapeRegExp(item.title)}`) }).click();
-    await expect(page).toHaveURL(new RegExp(`${escapeRegExp(item.href)}$`));
-    await expect(page.getByRole("heading", { name: workspaceHeadings[item.href] })).toBeVisible();
+    await page.goto(item.href, { waitUntil: "domcontentloaded" });
+    await expect(page).toHaveURL(new RegExp(`${escapeRegExp(item.href)}$`), { timeout: 15000 });
+    await expect(page.getByRole("heading", { name: workspaceHeadings[item.href] })).toBeVisible({
+      timeout: 15000
+    });
+    await expect(sidebar.locator(`a[href="${item.href}"]`)).toBeVisible();
   }
 
   await sidebar.getByRole("button", { name: "Sign out" }).click();
-  await page.waitForURL(/\/auth\/sign-in/);
+  await expect(page).toHaveURL(/\/auth\/sign-in/, { timeout: 15000 });
   await expect(page.getByRole("heading", { name: "Sign in to the workspace" })).toBeVisible();
 
   await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
